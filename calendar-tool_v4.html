@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screening Calendar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f0ede8;
+      --surface:   #ffffff;
+      --surface2:  #f7f5f2;
+      --border:    #d8d3cb;
+      --text:      #1a1a1a;
+      --muted:     #666;
+      --accent:    #c0392b;       /* cinema red */
+      --accent2:   #2c3e50;       /* dark slate */
+      --midnight:  #1a1040;
+      --rivoli:    #7b5ea7;
+      --rivolirevival: #b5427a;
+      --rental:    #1a6b3c;
+      --other:     #8a6020;
+      --regular:   #1a4580;
+      --conflict:  #e74c3c;
+      --ok:        #27ae60;
+      --warn:      #e67e22;
+      --tag-h:     18px;
+      --radius:    5px;
+      --shadow:    0 1px 4px rgba(0,0,0,.08);
+    }
+
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      background: var(--accent2);
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .app-header h1 { font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+    .app-header .subtitle { font-size: 12px; opacity: .6; margin-top: 2px; }
+
+    /* ── Layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    .full { grid-column: 1 / -1; }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      background: var(--accent2);
+      color: #fff;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-body { padding: 14px 16px; }
+
+    /* ── Calendar ── */
+    .cal-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .cal-controls .month-label {
+      font-size: 16px;
+      font-weight: 700;
+      flex: 1;
+      text-align: center;
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .cal-dow {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 4px 0 6px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .cal-cell {
+      border: 1px solid var(--border);
+      min-height: 90px;
+      padding: 5px;
+      cursor: pointer;
+      background: var(--surface);
+      border-radius: 3px;
+      display: flex;
+      flex-direction: column;
+      transition: border-color .15s, box-shadow .15s;
+      position: relative;
+    }
+    .cal-cell:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .cal-cell.empty { background: var(--surface2); cursor: default; border-color: transparent; }
+    .cal-cell.empty:hover { border-color: transparent; box-shadow: none; }
+
+    .cal-day-num {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .cal-chips {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+      flex: 1;
+    }
+    .chip {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #fff;
+      font-weight: 600;
+    }
+    .chip.regular    { background: var(--regular); }
+    .chip.midnight   { background: var(--midnight); }
+    .chip.rivoli        { background: var(--rivoli); }
+    .chip.rivolirevival { background: var(--rivolirevival); }
+    .chip.rental     { background: var(--rental); }
+    .chip.other      { background: var(--other); }
+    .chip.conflict-chip { background: var(--conflict); }
+
+    .conflict-badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--conflict);
+    }
+    .ok-badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ok);
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 500;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 20px 10px 20px;
+      overflow-y: auto;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal-box {
+      background: var(--surface);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 640px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+      margin: auto;
+    }
+    .modal-head {
+      background: var(--accent2);
+      color: #fff;
+      padding: 12px 18px;
+      font-weight: 700;
+      font-size: 15px;
+      border-radius: var(--radius) var(--radius) 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-head button {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.7);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+    .modal-head button:hover { color: #fff; }
+    .modal-body { padding: 16px 18px; }
+
+    /* conflict summary inside modal */
+    .conflict-summary {
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .conflict-summary.show { display: block; }
+    .conflict-summary.ok   { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+    .conflict-summary.warn { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+    .conflict-summary.bad  { background: #ffebee; color: #b71c1c; border: 1px solid #ef9a9a; }
+
+    /* screening blocks */
+    .screening-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .screening-block {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .screening-block-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    .screening-block-head .scr-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      min-width: 80px;
+    }
+    .screening-block-head .remove-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+    }
+    .screening-block-head .remove-btn:hover { color: var(--conflict); }
+
+    .slot-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--accent2);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 1px 6px;
+      line-height: 1.4;
+    }
+    .slot-btn:hover { background: var(--surface2); }
+    .slot-btn:disabled { opacity: .3; cursor: default; }
+
+    .screening-block-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+    .row2 { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+    .row3 { display: grid; grid-template-columns: 1fr 80px auto; gap: 8px; align-items: end; }
+
+    label.field-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      display: block;
+      margin-bottom: 3px;
+    }
+    input[type=text], input[type=number], select {
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-size: 13px;
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color .15s;
+    }
+    input[type=text]:focus, input[type=number]:focus, select:focus {
+      outline: none;
+      border-color: var(--accent2);
+    }
+
+    .type-select { font-weight: 600; }
+    .type-select.t-regular   { color: var(--regular); }
+    .type-select.t-midnight  { color: var(--midnight); }
+    .type-select.t-rivoli        { color: var(--rivoli); }
+    .type-select.t-rivolirevival { color: var(--rivolirevival); }
+    .type-select.t-rental    { color: var(--rental); }
+    .type-select.t-other     { color: var(--other); }
+
+    /* in-window toggle */
+    .window-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .window-row input[type=checkbox] { width: auto; accent-color: var(--accent2); }
+    .window-label { font-weight: 600; }
+
+    /* compilation */
+    .comp-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 6px 0 0;
+    }
+    .comp-toggle-row input[type=checkbox] { width: auto; accent-color: var(--accent2); }
+
+    .comp-films { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .comp-film-row {
+      display: grid;
+      grid-template-columns: 1fr 70px auto;
+      gap: 6px;
+      align-items: end;
+    }
+    .add-comp-btn {
+      font-size: 11px;
+      padding: 4px 10px;
+      background: var(--surface2);
+      border: 1px dashed var(--border);
+      border-radius: 3px;
+      color: var(--accent2);
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+      font-weight: 700;
+    }
+    .add-comp-btn:hover { background: #e8eaf6; }
+
+    /* add screening */
+    .add-screening-area {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .add-screening-area select {
+      flex: 1;
+      font-size: 13px;
+    }
+
+    /* buttons */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary  { background: var(--accent2); color: #fff; }
+    .btn-danger   { background: var(--conflict); color: #fff; }
+    .btn-neutral  { background: #eceff1; color: var(--text); }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+    .btn-icon { padding: 5px 8px; font-size: 14px; }
+
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 8px;
+    }
+    .modal-footer-right { display: flex; gap: 8px; }
+
+    /* ── Tables ── */
+    .table-wrap { max-height: 480px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th {
+      background: var(--surface2);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted);
+      padding: 8px 10px;
+      position: sticky;
+      top: 0;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    td { padding: 7px 10px; border-bottom: 1px solid #f0ede8; vertical-align: middle; }
+    tr:hover td { background: var(--surface2); }
+    tr.clickable { cursor: pointer; }
+
+    .type-pill {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .type-pill.regular   { background: var(--regular); }
+    .type-pill.midnight  { background: var(--midnight); }
+    .type-pill.rivoli        { background: var(--rivoli); }
+    .type-pill.rivolirevival { background: var(--rivolirevival); }
+    .type-pill.rental    { background: var(--rental); }
+    .type-pill.other     { background: var(--other); }
+
+    .yes-pill { background: #e8f5e9; color: #1b5e20; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+    .conflict-pill { background: #ffebee; color: #b71c1c; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+
+    .export-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .empty-msg {
+      padding: 32px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* Grouped screenings table */
+    .td-date   { white-space: nowrap; vertical-align: top; font-weight: 700; font-size: 12px; }
+    .td-cinema { white-space: nowrap; vertical-align: top; font-weight: 700; font-size: 12px; }
+    .td-slots  { padding: 0 !important; }
+
+    .slot-cell-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+    }
+    .slot-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      min-width: 20px;
+      text-align: center;
+      padding: 2px 5px;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+    .slot-cell-main { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+    .slot-program-title { font-size: 13px; font-weight: 600; }
+    .slot-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+    .slot-divider { border: none; border-top: 1px dashed var(--border); margin: 0; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1>Screening Calendar</h1>
+    <div class="subtitle">Payment &amp; scheduling tracker</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Calendar -->
+  <div class="card">
+    <div class="card-header">
+      Calendar View
+      <span style="font-size:10px;font-weight:400;opacity:.7;">click a day to edit</span>
+    </div>
+    <div class="card-body">
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--regular)"></div> Regular</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--midnight)"></div> Midnight</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--rivoli)"></div> Rivoli</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--rivolirevival)"></div> Rivoli Revival</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--rental)"></div> Rental/Event</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--other)"></div> Other</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--conflict)"></div> Time overlap</div>
+      </div>
+      <div class="cal-controls">
+        <button class="btn btn-neutral btn-sm" onclick="prevMonth()">←</button>
+        <div class="month-label" id="monthLabel"></div>
+        <button class="btn btn-neutral btn-sm" onclick="nextMonth()">→</button>
+        <button class="btn btn-neutral btn-sm" onclick="goToday()">Today</button>
+      </div>
+      <div class="cal-grid" id="calGrid">
+        <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div>
+        <div class="cal-dow">Tue</div><div class="cal-dow">Wed</div>
+        <div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
+        <div class="cal-dow">Sat</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screenings Table -->
+  <div class="card">
+    <div class="card-header">Screenings Table</div>
+    <div class="card-body">
+      <div class="export-bar">
+        <button class="btn btn-neutral btn-sm" onclick="exportScreeningsCSV()">Export CSV</button>
+        <button class="btn btn-neutral btn-sm" onclick="exportScreeningsJSON()">Export JSON</button>
+        <button class="btn btn-danger btn-sm" onclick="clearAll()">Clear All</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="screeningsThead"><tr>
+              <th>Date</th>
+              <th>Day</th>
+              <th>Cinema</th>
+            </tr></thead>
+          <tbody id="screeningsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Films Table -->
+  <div class="card full">
+    <div class="card-header">Films by Date</div>
+    <div class="card-body">
+      <div class="export-bar">
+        <button class="btn btn-neutral btn-sm" onclick="exportFilmsCSV()">Export Films CSV</button>
+        <button class="btn btn-neutral btn-sm" onclick="exportFilmsJSON()">Export Films JSON</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="filmsThead"><tr><th>Film</th><th>Year</th></tr></thead>
+          <tbody id="filmsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════ EDIT MODAL ═══════════════ -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="modalTitle">Edit Day</span>
+      <button onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="conflict-summary" id="conflictSummary"></div>
+      <div class="screening-list" id="screeningList"></div>
+      <div class="add-screening-area">
+        <select id="newScreeningType" onchange="syncCinemaToType(this.value)">
+          <option value="regular">Regular</option>
+          <option value="midnight">Midnight</option>
+          <option value="rivoli">Rivoli</option>
+          <option value="rivolirevival">Rivoli Revival</option>
+          <option value="rental">Rental/Event</option>
+          <option value="other">Other</option>
+        </select>
+        <select id="newScreeningCinema">
+          <option value="C1">Cinema 1</option>
+          <option value="C2">Cinema 2</option>
+          <option value="Rivoli">Rivoli</option>
+          <option value="RivoliRevival">Rivoli Revival</option>
+          <option value="Other">Other Screen</option>
+        </select>
+        <button class="btn btn-neutral btn-sm" onclick="addScreening()">+ Add Screening</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="deleteDay()">Delete Day</button>
+      <div class="modal-footer-right">
+        <button class="btn btn-neutral btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveDay()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// ─── Firebase init ────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAV1lNl8LDO1PxQg03oc3cGQ9icCDebqAA",
+  authDomain: "cug-film-scheduler.firebaseapp.com",
+  databaseURL: "https://cug-film-scheduler-default-rtdb.firebaseio.com",
+  projectId: "cug-film-scheduler",
+  storageBucket: "cug-film-scheduler.firebasestorage.app",
+  messagingSenderId: "421768606479",
+  appId: "1:421768606479:web:0e16d19a5edaddc545847a"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const CAL_REF = db.ref('calendarData');
+
+// ════════════════════════════════════════════
+//  DATA MODEL
+//  calendarData[dateStr] = [ ...screeningObj ]
+//
+//  screeningObj = {
+//    cinema:           'C1' | 'C2' | 'Rivoli' | 'RivoliRevival' | 'Other',
+//    slotOrder:        number,   // 1 = Early Show, 2 = Late Show (where applicable)
+//    type:             'regular' | 'midnight' | 'rivoli' | 'rivolirevival' | 'rental' | 'other',
+//    showSlot:         'early' | 'late' | 'single'  // derived from slotOrder + cinema type
+//    afterHours:       boolean   // screening is outside regular operating hours
+//    isCompilation:    boolean,
+//    compilationTitle: string,   // program/block title when isCompilation = true
+//    films: [{ title: string, year: string }]  // 1+ entries
+//  }
+// ════════════════════════════════════════════
+
+let calendarData = {};
+let currentDate  = new Date();
+let editingDate  = null;
+let editingScreenings = [];
+
+const TYPE_LABELS = {
+  regular:      'Regular',
+  midnight:     'Midnight',
+  rivoli:       'Rivoli',
+  rivolirevival:'Rivoli Revival',
+  rental:       'Rental/Event',
+  other:        'Other'
+};
+
+// Which cinemas/types support Early + Late slots vs single only
+const MULTI_SLOT_TYPES = new Set(['regular', 'rivoli', 'rental']);
+// Physical room groupings for conflict detection (Rivoli and RivoliRevival share a room)
+const PHYSICAL_ROOM = { C1:'C1', C2:'C2', Rivoli:'Rivoli', RivoliRevival:'Rivoli', Other:'Other' };
+
+function slotLabel(s) {
+  if (!MULTI_SLOT_TYPES.has(s.type)) return 'Single';
+  if (s.type === 'rivolirevival') return 'Single';
+  if ((s.type === 'rental' || s.type === 'other') && s.afterHours) return 'After Hours';
+  return (s.slotOrder || 1) === 1 ? 'Early Show' : 'Late Show';
+}
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+
+// ─── Persistence ────────────────────────────
+// save() pushes the full calendarData object to Firebase
+function save() {
+  CAL_REF.set(calendarData).catch(err => console.error('Firebase save error:', err));
+}
+
+// load() is called once at init; after that, onValue() keeps data live
+function load() {
+  // Handled by the live listener in the Init block below
+}
+
+// ─── Conflict logic ──────────────────────────
+// Conflict = two non-midnight screenings share the same physical room AND same show slot
+// (Early vs Late). Rivoli and Rivoli Revival share the same physical room.
+// Rental/Event and Other are single-slot and conflict with anything else in that room.
+// Midnight never conflicts.
+
+const EXCLUSIVE_TYPES = new Set(['other']); // rental now has Early/Late so only 'other' is fully exclusive
+
+function physicalRoom(s) {
+  return PHYSICAL_ROOM[s.cinema] || s.cinema;
+}
+
+function effectiveSlot(s) {
+  // midnight = never conflicts; single-slot types = 'single'; early/late for multi-slot
+  if (s.type === 'midnight') return null;
+  if (EXCLUSIVE_TYPES.has(s.type)) return 'exclusive'; // conflicts with everything in room
+  if (!MULTI_SLOT_TYPES.has(s.type)) return 'single';
+  return (s.slotOrder || 1) === 1 ? 'early' : 'late';
+}
+
+function conflictingRooms(screenings) {
+  // Group by physical room, excluding midnight and after-hours screenings
+  const byRoom = {};
+  screenings.forEach(s => {
+    if (s.type === 'midnight') return;
+    if (s.afterHours) return; // outside operating hours — no conflict possible
+    const slot = effectiveSlot(s);
+    if (slot === null) return;
+    const room = physicalRoom(s);
+    if (!byRoom[room]) byRoom[room] = [];
+    byRoom[room].push({ s, slot });
+  });
+
+  const bad = [];
+  for (const [room, entries] of Object.entries(byRoom)) {
+    if (entries.length < 2) continue;
+    // Check every pair
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i].slot, b = entries[j].slot;
+        // exclusive conflicts with anything; same named slot conflicts with itself
+        if (a === 'exclusive' || b === 'exclusive' || a === b) {
+          if (!bad.includes(room)) bad.push(room);
+        }
+      }
+    }
+  }
+  return bad;
+}
+
+function conflictLevel(screenings) {
+  const active = screenings.filter(s => s.type !== 'midnight');
+  if (active.length === 0) return 'none';
+  return conflictingRooms(screenings).length > 0 ? 'conflict' : 'ok';
+}
+
+function conflictMessage(screenings) {
+  const active = screenings.filter(s => s.type !== 'midnight');
+  if (active.length === 0) return { level: 'none', msg: '' };
+
+  const bad = conflictingRooms(screenings);
+  if (bad.length > 0) {
+    const names = bad.map(r => cinemaPrettyName(r) || r).join(', ');
+    return { level: 'bad', msg: '\u26a0 Scheduling conflict in ' + names };
+  }
+
+  const total = active.length;
+  return { level: 'ok', msg: '\u2713 ' + total + ' screening' + (total > 1 ? 's' : '') + ' \u2014 no conflicts' };
+}
+
+// ─── Calendar render ─────────────────────────
+function renderCalendar() {
+  const y = currentDate.getFullYear();
+  const m = currentDate.getMonth();
+  document.getElementById('monthLabel').textContent = `${MONTHS[m]} ${y}`;
+  const grid = document.getElementById('calGrid');
+  // Remove old day cells
+  Array.from(grid.querySelectorAll('.cal-cell')).forEach(el => el.remove());
+
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInM  = new Date(y, m+1, 0).getDate();
+
+  for (let i = 0; i < firstDow; i++) {
+    const e = document.createElement('div');
+    e.className = 'cal-cell empty';
+    grid.appendChild(e);
+  }
+
+  for (let d = 1; d <= daysInM; d++) {
+    const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell';
+    cell.onclick = () => openModal(ds);
+
+    const scrns = calendarData[ds] || [];
+
+    // Conflict badge
+    if (scrns.length > 0) {
+      const lvl = conflictLevel(scrns);
+      if (lvl === 'conflict') {
+        const badge = document.createElement('div');
+        badge.className = 'conflict-badge';
+        cell.appendChild(badge);
+      } else if (lvl === 'ok') {
+        const badge = document.createElement('div');
+        badge.className = 'ok-badge';
+        cell.appendChild(badge);
+      }
+    }
+
+    let html = `<div class="cal-day-num">${d}</div><div class="cal-chips">`;
+    scrns.slice(0, 5).forEach(s => {
+      const displayTitle = s.isCompilation && s.compilationTitle
+        ? s.compilationTitle
+        : (s.films[0]?.title || '(untitled)');
+      const afterTag = (s.afterHours || s.type === 'midnight') ? ' ★' : '';
+      const slotTag = s.type !== 'midnight' ? ' ' + slotLabel(s) : ' After Hours';
+      const label = `[${s.cinema} ${slotTag.trim()}${afterTag}] ${displayTitle.substring(0,18)}`;
+      html += `<div class="chip ${s.type}">${label}</div>`;
+    });
+    if (scrns.length > 5) html += `<div class="chip other">+${scrns.length-5} more</div>`;
+    html += '</div>';
+    cell.innerHTML += html;
+    grid.appendChild(cell);
+  }
+}
+
+// ─── Table renders ───────────────────────────
+
+// Derive the display program title for a screening
+function programTitle(s) {
+  if (s.isCompilation) {
+    return s.compilationTitle || s.films.map(f => f.title).join(' / ');
+  }
+  const f = s.films[0] || {};
+  const t = f.title || '';
+  const y = f.year  || '';
+  return t ? (y ? t + ' (' + y + ')' : t) : '';
+}
+
+function renderScreeningsTable() {
+  const thead = document.getElementById('screeningsThead');
+  const tbody = document.getElementById('screeningsTbody');
+  tbody.innerHTML = '';
+
+  const entries = Object.entries(calendarData)
+    .filter(([,v]) => v.length > 0)
+    .sort((a,b) => a[0].localeCompare(b[0]));
+
+  if (entries.length === 0) {
+    thead.innerHTML = '<tr><th>Date</th><th>Day</th><th>Cinema</th></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-msg">No screenings yet — click a day to add.</td></tr>';
+    return;
+  }
+
+  // Build all date+cinema groups so we can find the max slot count for header
+  const groups = []; // { ds, dow, cinema, slots[] }
+  entries.forEach(([ds, scrns]) => {
+    const date = new Date(ds + 'T00:00:00');
+    const dow  = DAYS[date.getDay()];
+    const sorted = [...scrns].sort((a,b) => {
+      if (a.cinema < b.cinema) return -1;
+      if (a.cinema > b.cinema) return 1;
+      return (a.slotOrder||1) - (b.slotOrder||1);
+    });
+    // Group by cinema within this date
+    const cinemaMap = {};
+    sorted.forEach(s => {
+      if (!cinemaMap[s.cinema]) cinemaMap[s.cinema] = [];
+      cinemaMap[s.cinema].push(s);
+    });
+    const cinemaOrder = ['C1','C2','Rivoli','Other'];
+    const cinemasHere = cinemaOrder.filter(c => cinemaMap[c]);
+    Object.keys(cinemaMap).filter(c => !cinemaOrder.includes(c)).forEach(c => cinemasHere.push(c));
+    cinemasHere.forEach(cinema => {
+      groups.push({ ds, dow, cinema, slots: cinemaMap[cinema] });
+    });
+  });
+
+  // Max slots across all groups → determines how many slot columns to render
+  const maxSlots = Math.max(...groups.map(g => g.slots.length));
+
+  // Build header: Date, Day, Cinema, then Slot 1 cols, Slot 2 cols, …
+  let hdrHTML = '<tr><th>Date</th><th>Day</th><th>Cinema</th>';
+  for (let i = 1; i <= maxSlots; i++) {
+    hdrHTML += '<th>Slot ' + i + ' — Program Title</th>'
+      + '<th>Slot ' + i + ' — Films</th>'
+      + '<th>Slot ' + i + ' — Type</th>'
+      + '<th>Slot ' + i + ' — Window</th>';
+  }
+  hdrHTML += '</tr>';
+  thead.innerHTML = hdrHTML;
+
+  // Build rows
+  groups.forEach(({ ds, dow, cinema, slots }) => {
+    const row = document.createElement('tr');
+    row.className = 'clickable';
+    row.onclick = () => openModal(ds);
+
+    let html = '<td>' + ds + '</td><td>' + dow + '</td><td>' + cinemaPrettyName(cinema) + '</td>';
+
+    for (let i = 0; i < maxSlots; i++) {
+      const s = slots[i];
+      if (!s) {
+        html += '<td></td><td></td><td></td><td></td>';
+        continue;
+      }
+      const pt = programTitle(s);
+      const filmStr = s.isCompilation
+        ? s.films.map(f => f.title + (f.year ? ' (' + f.year + ')' : '')).join(' / ')
+        : (s.films[0]?.title || '');
+      const compTag = s.isCompilation ? ' <span class="yes-pill">Comp.</span>' : '';
+      html += '<td>' + (pt ? '<em>' + pt + '</em>' : '') + compTag + '</td>'
+        + '<td>' + filmStr + '</td>'
+        + '<td><span class="type-pill ' + s.type + '">' + TYPE_LABELS[s.type] + '</span></td>'
+        + '<td>' + slotLabel(s) + '</td>'
+        + '<td>' + (s.afterHours ? '<span class="conflict-pill">After Hours</span>' : '') + '</td>';
+    }
+
+    row.innerHTML = html;
+    tbody.appendChild(row);
+  });
+}
+
+function renderFilmsTable() {
+  const thead = document.getElementById('filmsThead');
+  const tbody = document.getElementById('filmsTbody');
+
+  const filmMap = {}; // key: "title|||year" -> [dateStr,...]
+
+  Object.entries(calendarData)
+    .filter(([,v]) => v.length > 0)
+    .sort((a,b) => a[0].localeCompare(b[0]))
+    .forEach(([ds, scrns]) => {
+      scrns.forEach(s => {
+        s.films.forEach(f => {
+          const k = `${f.title}|||${f.year||''}`;
+          if (!filmMap[k]) filmMap[k] = { title: f.title, year: f.year||'', dates: [] };
+          if (!filmMap[k].dates.includes(ds)) filmMap[k].dates.push(ds);
+        });
+      });
+    });
+
+  const sorted = Object.values(filmMap).sort((a,b) => a.title.localeCompare(b.title));
+  if (sorted.length === 0) {
+    thead.innerHTML = '<tr><th>Film</th><th>Year</th></tr>';
+    tbody.innerHTML = `<tr><td colspan="2" class="empty-msg">No films yet.</td></tr>`;
+    return;
+  }
+
+  const maxDates = Math.max(...sorted.map(f => f.dates.length));
+  let hdr = '<tr><th>Film</th><th>Year</th>';
+  for (let i=1; i<=maxDates; i++) hdr += `<th>Date ${i}</th>`;
+  hdr += '</tr>';
+  thead.innerHTML = hdr;
+
+  tbody.innerHTML = '';
+  sorted.forEach(f => {
+    let row = `<tr><td><strong>${f.title}</strong></td><td>${f.year}</td>`;
+    for (let i=0; i<maxDates; i++) row += `<td>${f.dates[i]||''}</td>`;
+    row += '</tr>';
+    tbody.innerHTML += row;
+  });
+}
+
+function renderAll() {
+  renderCalendar();
+  renderScreeningsTable();
+  renderFilmsTable();
+}
+
+// ─── Modal ───────────────────────────────────
+function openModal(ds) {
+  editingDate = ds;
+  const date = new Date(ds + 'T00:00:00');
+  document.getElementById('modalTitle').textContent =
+    `${DAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+
+  editingScreenings = JSON.parse(JSON.stringify(calendarData[ds] || []));
+  renderModalScreenings();
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('editModal').classList.remove('open');
+  editingDate = null;
+  editingScreenings = [];
+}
+
+function renderModalScreenings() {
+  const list = document.getElementById('screeningList');
+  list.innerHTML = '';
+
+  // Group screenings by cinema, sorted by slotOrder within each cinema
+  const cinemaOrder = ['C1','C2','Rivoli','Other'];
+  const byCinema = {};
+  editingScreenings.forEach((s, idx) => {
+    if (!byCinema[s.cinema]) byCinema[s.cinema] = [];
+    byCinema[s.cinema].push({ s, idx });
+  });
+
+  // Sort each cinema's screenings by slotOrder
+  Object.values(byCinema).forEach(arr =>
+    arr.sort((a,b) => (a.s.slotOrder||1) - (b.s.slotOrder||1))
+  );
+
+  // Render grouped: Cinema headers then their screenings
+  const cinemasPresent = cinemaOrder.filter(c => byCinema[c]);
+  // Also handle any cinema name not in cinemaOrder
+  Object.keys(byCinema).filter(c => !cinemaOrder.includes(c)).forEach(c => cinemasPresent.push(c));
+
+  if (cinemasPresent.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No screenings yet — add one below.</div>';
+    updateConflictSummary();
+    return;
+  }
+
+  cinemasPresent.forEach(cinema => {
+    // Cinema group header
+    const groupHead = document.createElement('div');
+    groupHead.style.cssText = 'font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.06em;padding:4px 0 2px;margin-top:4px;border-bottom:2px solid var(--accent2);margin-bottom:6px;';
+    groupHead.textContent = cinemaPrettyName(cinema);
+    list.appendChild(groupHead);
+
+    byCinema[cinema].forEach(({ s, idx }) => {
+      const block = document.createElement('div');
+      block.className = 'screening-block';
+      block.id = `scr-block-${idx}`;
+
+      const isComp = s.isCompilation;
+
+      block.innerHTML = `
+        <div class="screening-block-head">
+          <span class="scr-num">${slotLabel(s)}</span>
+
+          <button class="remove-btn" onclick="removeScreening(${idx})" title="Remove">✕</button>
+        </div>
+        <div class="screening-block-body">
+          <!-- Row: type + show slot (Early/Late where applicable) -->
+          <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:end">
+            <div>
+              <label class="field-label">Screening Type</label>
+              <select class="type-select t-${s.type}" onchange="updateScreeningField(${idx},'type',this.value);updateTypeColor(this)">
+                ${Object.entries(TYPE_LABELS).map(([v,l]) =>
+                  `<option value="${v}" ${s.type===v?'selected':''}>${l}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div id="showslot-wrap-${idx}" ${(s.afterHours && (s.type==='rental'||s.type==='other')) ? 'style="display:none"' : ''}>
+              <label class="field-label">Show Slot</label>
+              ${MULTI_SLOT_TYPES.has(s.type) && s.type !== 'rivolirevival' ? `
+              <select id="showslot-${idx}" onchange="updateSlotOrder(${idx}, this.value)">
+                <option value="1" ${(s.slotOrder||1)===1?'selected':''}>Early Show</option>
+                <option value="2" ${(s.slotOrder||1)===2?'selected':''}>Late Show</option>
+              </select>` : `
+              <div style="padding:7px 9px;font-size:13px;color:var(--muted);border:1px solid var(--border);border-radius:3px;background:var(--surface2)">
+                ${s.type === 'midnight' ? 'After Hours' : 'Single'}
+              </div>`}
+            </div>
+          </div>
+
+          <!-- After-hours ticker: only for Rental/Event and Other -->
+          ${(s.type === 'rental' || s.type === 'other') ? `
+          <div class="comp-toggle-row">
+            <input type="checkbox" id="afterhours-${idx}" ${s.afterHours?'checked':''}
+              onchange="updateScreeningField(${idx},'afterHours',this.checked);toggleAfterHoursSlot(${idx},this.checked)">
+            <label for="afterhours-${idx}" style="font-size:12px;font-weight:700;color:var(--muted)">
+              Outside regular operating hours
+            </label>
+          </div>` : ''}
+
+          <!-- Compilation toggle -->
+          <div class="comp-toggle-row">
+            <input type="checkbox" id="comp-${idx}" ${isComp?'checked':''}
+              onchange="toggleCompilation(${idx},this.checked)">
+            <label for="comp-${idx}" style="font-size:12px;font-weight:700;color:var(--muted)">
+              Compilation / multi-film program
+            </label>
+          </div>
+
+          <!-- Compilation title (shown when isCompilation) -->
+          <div id="comp-title-area-${idx}" style="${isComp?'':'display:none'}">
+            <label class="field-label">Program / Block Title</label>
+            <input type="text" placeholder="e.g. Collected Shorts of Jan Švankmajer…"
+              value="${esc(s.compilationTitle||'')}"
+              onchange="updateScreeningField(${idx},'compilationTitle',this.value)"
+              oninput="updateScreeningField(${idx},'compilationTitle',this.value)">
+          </div>
+
+          <!-- Films area -->
+          <div id="films-area-${idx}">
+            ${isComp ? buildCompFilmsHTML(idx, s.films) : buildSingleFilmHTML(idx, s.films[0]||{title:'',year:''})}
+          </div>
+        </div>
+      `;
+      list.appendChild(block);
+
+      // Start time — just trigger conflict recheck on change (already handled via oninput above)
+    });
+  });
+
+  updateConflictSummary();
+}
+
+function buildSingleFilmHTML(idx, film) {
+  return `
+    <div class="row3" id="single-film-${idx}">
+      <div>
+        <label class="field-label">Film Title</label>
+        <input type="text" placeholder="Film title…"
+          value="${esc(film.title||'')}"
+          onchange="updateFilm(${idx},0,'title',this.value)"
+          oninput="updateFilm(${idx},0,'title',this.value)">
+      </div>
+      <div>
+        <label class="field-label">Year</label>
+        <input type="number" placeholder="Year" min="1880" max="2099"
+          value="${esc(film.year||'')}"
+          onchange="updateFilm(${idx},0,'year',this.value)"
+          oninput="updateFilm(${idx},0,'year',this.value)">
+      </div>
+      <div></div>
+    </div>
+  `;
+}
+
+function buildCompFilmsHTML(idx, films) {
+  let html = `<div class="comp-films" id="comp-films-${idx}">`;
+  films.forEach((f, fi) => {
+    html += buildCompFilmRow(idx, fi, f);
+  });
+  html += `</div>
+    <button class="add-comp-btn" onclick="addCompFilm(${idx})">+ Add film to program</button>`;
+  return html;
+}
+
+function buildCompFilmRow(idx, fi, f) {
+  return `
+    <div class="comp-film-row" id="comp-film-${idx}-${fi}">
+      <div>
+        <label class="field-label">Film ${fi+1} title</label>
+        <input type="text" placeholder="Film title…"
+          value="${esc(f.title||'')}"
+          onchange="updateFilm(${idx},${fi},'title',this.value)"
+          oninput="updateFilm(${idx},${fi},'title',this.value)">
+      </div>
+      <div>
+        <label class="field-label">Year</label>
+        <input type="number" placeholder="Year" min="1880" max="2099"
+          value="${esc(f.year||'')}"
+          onchange="updateFilm(${idx},${fi},'year',this.value)"
+          oninput="updateFilm(${idx},${fi},'year',this.value)">
+      </div>
+      <div style="padding-bottom:2px">
+        <label class="field-label" style="opacity:0">Del</label>
+        <button class="btn btn-neutral btn-icon" onclick="removeCompFilm(${idx},${fi})" title="Remove film">✕</button>
+      </div>
+    </div>
+  `;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function updateTypeColor(sel) {
+  sel.className = `type-select t-${sel.value}`;
+}
+
+function updateScreeningField(idx, field, value) {
+  editingScreenings[idx][field] = value;
+  if (field === 'type') updateConflictSummary();
+}
+
+function updateFilm(idx, fi, field, value) {
+  if (!editingScreenings[idx].films[fi]) editingScreenings[idx].films[fi] = { title:'', year:'' };
+  editingScreenings[idx].films[fi][field] = value;
+}
+
+function cinemaPrettyName(c) {
+  return { C1:'Cinema 1', C2:'Cinema 2', Rivoli:'Rivoli', RivoliRevival:'Rivoli Revival', Other:'Other Screen' }[c] || c;
+}
+
+function updateSlotOrder(idx, val) {
+  editingScreenings[idx].slotOrder = parseInt(val);
+  updateConflictSummary();
+}
+
+function toggleAfterHoursSlot(idx, isAfterHours) {
+  const wrap = document.getElementById('showslot-wrap-' + idx);
+  if (wrap) wrap.style.display = isAfterHours ? 'none' : '';
+  updateConflictSummary();
+}
+
+function moveSlot(idx, delta) {
+  const s = editingScreenings[idx];
+  const cinema = s.cinema;
+  // Find siblings in same cinema
+  const siblings = editingScreenings
+    .map((sc, i) => ({ sc, i }))
+    .filter(({ sc }) => sc.cinema === cinema)
+    .sort((a,b) => (a.sc.slotOrder||1) - (b.sc.slotOrder||1));
+
+  const pos = siblings.findIndex(({ i }) => i === idx);
+  const swapPos = pos + delta;
+  if (swapPos < 0 || swapPos >= siblings.length) return;
+
+  // Swap slotOrder values
+  const mySlot    = editingScreenings[idx].slotOrder || 1;
+  const otherIdx  = siblings[swapPos].i;
+  const otherSlot = editingScreenings[otherIdx].slotOrder || 1;
+  editingScreenings[idx].slotOrder       = otherSlot;
+  editingScreenings[otherIdx].slotOrder  = mySlot;
+  renderModalScreenings();
+}
+
+function toggleCompilation(idx, isComp) {
+  editingScreenings[idx].isCompilation = isComp;
+  // Show/hide compilation title field
+  const titleArea = document.getElementById(`comp-title-area-${idx}`);
+  if (titleArea) titleArea.style.display = isComp ? '' : 'none';
+
+  const area = document.getElementById(`films-area-${idx}`);
+  if (isComp) {
+    const existing = editingScreenings[idx].films;
+    if (existing.length === 0) editingScreenings[idx].films = [{ title:'', year:'' }];
+    area.innerHTML = buildCompFilmsHTML(idx, editingScreenings[idx].films);
+  } else {
+    const first = editingScreenings[idx].films[0] || { title:'', year:'' };
+    editingScreenings[idx].films = [first];
+    area.innerHTML = buildSingleFilmHTML(idx, first);
+  }
+}
+
+function addCompFilm(idx) {
+  editingScreenings[idx].films.push({ title:'', year:'' });
+  const fi = editingScreenings[idx].films.length - 1;
+  const container = document.getElementById(`comp-films-${idx}`);
+  const row = document.createElement('div');
+  row.innerHTML = buildCompFilmRow(idx, fi, { title:'', year:'' });
+  container.appendChild(row.firstElementChild);
+}
+
+function removeCompFilm(idx, fi) {
+  if (editingScreenings[idx].films.length <= 1) return;
+  editingScreenings[idx].films.splice(fi, 1);
+  // Re-render films area
+  const area = document.getElementById(`films-area-${idx}`);
+  area.innerHTML = buildCompFilmsHTML(idx, editingScreenings[idx].films);
+}
+
+function addScreening() {
+  const cinema = document.getElementById('newScreeningCinema').value;
+  const type   = document.getElementById('newScreeningType').value;
+  // Auto-assign next slot order for this cinema
+  const existingInCinema = editingScreenings.filter(s => s.cinema === cinema);
+  const nextSlot = existingInCinema.length > 0
+    ? Math.max(...existingInCinema.map(s => s.slotOrder || 1)) + 1
+    : 1;
+  editingScreenings.push({
+    cinema,
+    slotOrder: nextSlot,
+    type,
+    afterHours: false,
+    isCompilation: false,
+    compilationTitle: '',
+    films: [{ title:'', year:'' }]
+  });
+  renderModalScreenings();
+  const list = document.getElementById('screeningList');
+  list.lastElementChild?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function removeScreening(idx) {
+  editingScreenings.splice(idx, 1);
+  renderModalScreenings();
+}
+
+function updateConflictSummary() {
+  const el = document.getElementById('conflictSummary');
+  const { level, msg } = conflictMessage(editingScreenings);
+  el.className = 'conflict-summary';
+  if (level === 'none') { el.style.display='none'; return; }
+  el.style.display='block';
+  el.classList.add('show', level === 'bad' ? 'bad' : 'ok');
+  el.textContent = msg;
+}
+
+function saveDay() {
+  // Strip empty screenings (no film title and not special)
+  const cleaned = editingScreenings.filter(s =>
+    s.films.some(f => f.title && f.title.trim() !== '')
+  );
+  if (cleaned.length > 0) {
+    calendarData[editingDate] = cleaned;
+  } else {
+    delete calendarData[editingDate];
+  }
+  save();
+  renderAll();
+  closeModal();
+}
+
+function deleteDay() {
+  if (confirm('Remove all screenings for this day?')) {
+    delete calendarData[editingDate];
+    save();
+    renderAll();
+    closeModal();
+  }
+}
+
+// ─── Navigation ──────────────────────────────
+function prevMonth() { currentDate.setMonth(currentDate.getMonth()-1); renderCalendar(); }
+function nextMonth() { currentDate.setMonth(currentDate.getMonth()+1); renderCalendar(); }
+function goToday()   { currentDate = new Date(); renderCalendar(); }
+
+// ─── Export ──────────────────────────────────
+function flatRows() {
+  const rows = [];
+  Object.entries(calendarData)
+    .filter(([,v]) => v.length > 0)
+    .sort((a,b) => a[0].localeCompare(b[0]))
+    .forEach(([ds, scrns]) => {
+      const date = new Date(ds+'T00:00:00');
+      const dow  = DAYS[date.getDay()];
+      // Sort by cinema then slotOrder
+      const sorted = [...scrns].sort((a,b) => {
+        const ca = a.cinema, cb = b.cinema;
+        if (ca < cb) return -1; if (ca > cb) return 1;
+        return (a.slotOrder||1) - (b.slotOrder||1);
+      });
+      sorted.forEach(s => {
+        const base = {
+          date: ds, day: dow,
+          cinema: cinemaPrettyName(s.cinema),
+          slot_order: s.slotOrder || 1,
+          type: s.type,
+          show_slot: slotLabel(s),
+          after_hours: s.afterHours || false,
+          is_compilation: s.isCompilation,
+          compilation_title: programTitle(s)
+        };
+        if (s.isCompilation) {
+          s.films.forEach((f, fi) => {
+            rows.push({ ...base, film_title: f.title, film_year: f.year||'', film_order: fi+1 });
+          });
+        } else {
+          const f = s.films[0]||{};
+          rows.push({ ...base, film_title: f.title||'', film_year: f.year||'', film_order: 1 });
+        }
+      });
+    });
+  return rows;
+}
+
+function exportScreeningsCSV() {
+  const rows = flatRows();
+  if (!rows.length) { alert('No data to export'); return; }
+  let csv = 'Date,Day,Cinema,Show Slot,After Hours,Type,Is Compilation,Program Title,Film Title,Year,Film Order\n';
+  rows.forEach(r => {
+    csv += [r.date,r.day,r.cinema,r.slot_order,r.type,r.in_window,r.is_compilation,
+      `"${(r.compilation_title||'').replace(/"/g,'""')}"`,
+      `"${r.film_title.replace(/"/g,'""')}"`,
+      r.show_slot, r.after_hours, r.type, r.is_compilation,
+      `"${(r.compilation_title||'').replace(/"/g,'"""')}"`,
+      `"${r.film_title.replace(/"/g,'"""')}"`,
+      r.film_year, r.film_order].join(',') + '\n';
+  });
+  dl(csv, 'screenings.csv', 'text/csv');
+}
+
+function exportScreeningsJSON() {
+  const rows = flatRows();
+  if (!rows.length) { alert('No data to export'); return; }
+  dl(JSON.stringify(rows, null, 2), 'screenings.json', 'application/json');
+}
+
+function exportFilmsCSV() {
+  const filmMap = {};
+  flatRows().forEach(r => {
+    const k = `${r.film_title}|||${r.film_year}`;
+    if (!filmMap[k]) filmMap[k] = { title: r.film_title, year: r.film_year, dates: [] };
+    if (!filmMap[k].dates.includes(r.date)) filmMap[k].dates.push(r.date);
+  });
+  const sorted = Object.values(filmMap).sort((a,b)=>a.title.localeCompare(b.title));
+  if (!sorted.length) { alert('No films to export'); return; }
+  const maxD = Math.max(...sorted.map(f=>f.dates.length));
+  let csv = 'Film,Year,' + Array.from({length:maxD},(_,i)=>`Date ${i+1}`).join(',') + '\n';
+  sorted.forEach(f => {
+    csv += `"${f.title.replace(/"/g,'""')}",${f.year},`+
+      Array.from({length:maxD},(_,i)=>f.dates[i]||'').join(',') + '\n';
+  });
+  dl(csv, 'films.csv', 'text/csv');
+}
+
+function exportFilmsJSON() {
+  const filmMap = {};
+  flatRows().forEach(r => {
+    const k = `${r.film_title}|||${r.film_year}`;
+    if (!filmMap[k]) filmMap[k] = { title: r.film_title, year: r.film_year, dates: [] };
+    if (!filmMap[k].dates.includes(r.date)) filmMap[k].dates.push(r.date);
+  });
+  const out = Object.values(filmMap).sort((a,b)=>a.title.localeCompare(b.title));
+  if (!out.length) { alert('No films to export'); return; }
+  dl(JSON.stringify(out, null, 2), 'films.json', 'application/json');
+}
+
+function clearAll() {
+  if (confirm('Clear all calendar data? This cannot be undone.')) {
+    calendarData = {};
+    save();
+    renderAll();
+  }
+}
+
+function dl(content, filename, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// Close modal on backdrop click
+document.getElementById('editModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('editModal')) closeModal();
+});
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+
+// ─── Init ────────────────────────────────────
+// Show a loading state until Firebase responds
+document.getElementById('calGrid').innerHTML += '<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>';
+
+// Live listener — fires on connect and whenever any other user saves
+CAL_REF.on('value', snapshot => {
+  calendarData = snapshot.val() || {};
+  renderAll();
+});
+</script>
+</body>
+</html>
