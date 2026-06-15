@@ -710,16 +710,16 @@ function load() {
 // 1. Slot conflict: two screenings share the same physical room AND same named slot
 //    (Early/Late/Single). Midnight and after-hours screenings are exempt.
 // 2. Time-window conflict: an after-hours rental/event/other with a specified time range
-//    overlaps the fixed Early Show window (4–7pm) or Late Show window (7–10:30pm) in
-//    the same physical room as a scheduled Early or Late screening.
+//    overlaps the fixed Early Show window (5:01pm–7pm) or Late Show window (7pm–10:30pm)
+//    in the same physical room as a scheduled Early or Late screening.
 
 const EXCLUSIVE_TYPES = new Set(['other']);
 
 // Fixed operating windows in minutes since midnight
-const EARLY_START = 17 * 60 + 1;   // 5:01 PM
-const EARLY_END   = 19 * 60;       // 7:00 PM
-const LATE_START  = 19 * 60;       // 7:00 PM
-const LATE_END    = 22 * 60 + 30;  // 10:30 PM
+const EARLY_START = 17 * 60 + 1;     // 5:01 PM
+const EARLY_END   = 19 * 60;         // 7:00 PM
+const LATE_START  = 19 * 60;         // 7:00 PM
+const LATE_END    = 22 * 60 + 30;    // 10:30 PM
 
 function toMins(timeStr) {
   if (!timeStr) return null;
@@ -816,7 +816,7 @@ function conflictMessage(screenings) {
       if (reason === 'slot')
         return name + ': same slot double-booked';
       if (reason === 'time-window:early')
-        return name + ': after-hours event overlaps Early Show window (4\u20137pm)';
+        return name + ': after-hours event overlaps Early Show window (5:01\u20137pm)';
       if (reason === 'time-window:late')
         return name + ': after-hours event overlaps Late Show window (7\u201310:30pm)';
       return name + ': conflict';
