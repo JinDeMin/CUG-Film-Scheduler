@@ -632,20 +632,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-// ─── Firebase init ────────────────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyAV1lNl8LDO1PxQg03oc3cGQ9icCDebqAA",
-  authDomain: "cug-film-scheduler.firebaseapp.com",
-  databaseURL: "https://cug-film-scheduler-default-rtdb.firebaseio.com",
-  projectId: "cug-film-scheduler",
-  storageBucket: "cug-film-scheduler.firebasestorage.app",
-  messagingSenderId: "421768606479",
-  appId: "1:421768606479:web:0e16d19a5edaddc545847a"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const CAL_REF = db.ref('calendarData');
-
 // ════════════════════════════════════════════
 //  DATA MODEL
 //  calendarData[dateStr] = [ ...screeningObj ]
@@ -656,6 +642,9 @@ const CAL_REF = db.ref('calendarData');
 //    type:             'regular' | 'midnight' | 'rivoli' | 'rivolirevival' | 'rental' | 'other',
 //    showSlot:         'early' | 'late' | 'single'  // derived from slotOrder + cinema type
 //    afterHours:       boolean   // screening is outside regular operating hours
+//    slotStart:        string    // 'HH:MM' start time (after-hours only)
+//    slotEnd:          string    // 'HH:MM' end time (auto-computed or manual)
+//    slotDuration:     number    // duration in minutes (auto-computed or manual)
 //    isCompilation:    boolean,
 //    compilationTitle: string,   // program/block title when isCompilation = true
 //    films: [{ title: string, year: string }]  // 1+ entries
@@ -681,10 +670,23 @@ const MULTI_SLOT_TYPES = new Set(['regular', 'rivoli', 'rental']);
 // Physical room groupings for conflict detection (Rivoli and RivoliRevival share a room)
 const PHYSICAL_ROOM = { C1:'C1', C2:'C2', Rivoli:'Rivoli', RivoliRevival:'Rivoli', Other:'Other' };
 
+function fmtTime12(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12  = h % 12 || 12;
+  return h12 + (m ? ':' + String(m).padStart(2,'0') : '') + ' ' + ampm;
+}
+
 function slotLabel(s) {
   if (!MULTI_SLOT_TYPES.has(s.type)) return 'Single';
   if (s.type === 'rivolirevival') return 'Single';
-  if ((s.type === 'rental' || s.type === 'other') && s.afterHours) return 'After Hours';
+  if ((s.type === 'rental' || s.type === 'other') && s.afterHours) {
+    if (s.slotStart && s.slotEnd)     return fmtTime12(s.slotStart) + '–' + fmtTime12(s.slotEnd);
+    if (s.slotStart && s.slotDuration) return fmtTime12(s.slotStart) + ' (' + s.slotDuration + 'min)';
+    if (s.slotStart)                   return fmtTime12(s.slotStart);
+    return 'After Hours';
+  }
   return (s.slotOrder || 1) === 1 ? 'Early Show' : 'Late Show';
 }
 
@@ -695,7 +697,7 @@ const MONTHS = ['January','February','March','April','May','June',
 // ─── Persistence ────────────────────────────
 // save() pushes the full calendarData object to Firebase
 function save() {
-  CAL_REF.set(calendarData).catch(err => console.error('Firebase save error:', err));
+  if (window.CAL_REF) window.CAL_REF.set(calendarData).catch(err => console.error('Firebase save error:', err));
 }
 
 // load() is called once at init; after that, onValue() keeps data live
@@ -704,69 +706,122 @@ function load() {
 }
 
 // ─── Conflict logic ──────────────────────────
-// Conflict = two non-midnight screenings share the same physical room AND same show slot
-// (Early vs Late). Rivoli and Rivoli Revival share the same physical room.
-// Rental/Event and Other are single-slot and conflict with anything else in that room.
-// Midnight never conflicts.
+// Two conflict types:
+// 1. Slot conflict: two screenings share the same physical room AND same named slot
+//    (Early/Late/Single). Midnight and after-hours screenings are exempt.
+// 2. Time-window conflict: an after-hours rental/event/other with a specified time range
+//    overlaps the fixed Early Show window (4–7pm) or Late Show window (7–10:30pm) in
+//    the same physical room as a scheduled Early or Late screening.
 
-const EXCLUSIVE_TYPES = new Set(['other']); // rental now has Early/Late so only 'other' is fully exclusive
+const EXCLUSIVE_TYPES = new Set(['other']);
+
+// Fixed operating windows in minutes since midnight
+const EARLY_START = 17 * 60 + 1;   // 5:01 PM
+const EARLY_END   = 19 * 60;       // 7:00 PM
+const LATE_START  = 19 * 60;       // 7:00 PM
+const LATE_END    = 22 * 60 + 30;  // 10:30 PM
+
+function toMins(timeStr) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
 
 function physicalRoom(s) {
   return PHYSICAL_ROOM[s.cinema] || s.cinema;
 }
 
 function effectiveSlot(s) {
-  // midnight = never conflicts; single-slot types = 'single'; early/late for multi-slot
   if (s.type === 'midnight') return null;
-  if (EXCLUSIVE_TYPES.has(s.type)) return 'exclusive'; // conflicts with everything in room
+  if (s.afterHours) return null; // handled separately via time-window check
+  if (EXCLUSIVE_TYPES.has(s.type)) return 'exclusive';
   if (!MULTI_SLOT_TYPES.has(s.type)) return 'single';
   return (s.slotOrder || 1) === 1 ? 'early' : 'late';
 }
 
-function conflictingRooms(screenings) {
-  // Group by physical room, excluding midnight and after-hours screenings
+// Returns array of conflict descriptor objects: { room, reason }
+function findConflicts(screenings) {
+  const conflicts = [];
+  const addConflict = (room, reason) => {
+    if (!conflicts.find(c => c.room === room && c.reason === reason))
+      conflicts.push({ room, reason });
+  };
+
+  // ── Type 1: slot conflicts (non-after-hours) ──
   const byRoom = {};
   screenings.forEach(s => {
-    if (s.type === 'midnight') return;
-    if (s.afterHours) return; // outside operating hours — no conflict possible
     const slot = effectiveSlot(s);
     if (slot === null) return;
     const room = physicalRoom(s);
     if (!byRoom[room]) byRoom[room] = [];
     byRoom[room].push({ s, slot });
   });
-
-  const bad = [];
   for (const [room, entries] of Object.entries(byRoom)) {
-    if (entries.length < 2) continue;
-    // Check every pair
     for (let i = 0; i < entries.length; i++) {
       for (let j = i + 1; j < entries.length; j++) {
         const a = entries[i].slot, b = entries[j].slot;
-        // exclusive conflicts with anything; same named slot conflicts with itself
-        if (a === 'exclusive' || b === 'exclusive' || a === b) {
-          if (!bad.includes(room)) bad.push(room);
-        }
+        if (a === 'exclusive' || b === 'exclusive' || a === b)
+          addConflict(room, 'slot');
       }
     }
   }
-  return bad;
+
+  // ── Type 2: after-hours time-window conflicts ──
+  const afterHours = screenings.filter(s =>
+    s.afterHours && s.slotStart && (s.slotEnd || s.slotDuration) &&
+    (s.type === 'rental' || s.type === 'other')
+  );
+
+  afterHours.forEach(ah => {
+    const room    = physicalRoom(ah);
+    const ahStart = toMins(ah.slotStart);
+    const ahEnd   = ah.slotEnd
+      ? toMins(ah.slotEnd)
+      : (ahStart + parseInt(ah.slotDuration || 0));
+
+    // Find non-after-hours screenings in the same room
+    const sameRoom = screenings.filter(s =>
+      !s.afterHours && s.type !== 'midnight' && physicalRoom(s) === room
+    );
+
+    sameRoom.forEach(s => {
+      const slot = effectiveSlot(s);
+      if (!slot || slot === 'exclusive' || slot === 'single') return;
+      const winStart = slot === 'early' ? EARLY_START : LATE_START;
+      const winEnd   = slot === 'early' ? EARLY_END   : LATE_END;
+      // Overlap if ranges intersect
+      if (ahStart < winEnd && ahEnd > winStart) {
+        addConflict(room, 'time-window:' + slot);
+      }
+    });
+  });
+
+  return conflicts;
 }
 
 function conflictLevel(screenings) {
   const active = screenings.filter(s => s.type !== 'midnight');
   if (active.length === 0) return 'none';
-  return conflictingRooms(screenings).length > 0 ? 'conflict' : 'ok';
+  return findConflicts(screenings).length > 0 ? 'conflict' : 'ok';
 }
 
 function conflictMessage(screenings) {
   const active = screenings.filter(s => s.type !== 'midnight');
   if (active.length === 0) return { level: 'none', msg: '' };
 
-  const bad = conflictingRooms(screenings);
-  if (bad.length > 0) {
-    const names = bad.map(r => cinemaPrettyName(r) || r).join(', ');
-    return { level: 'bad', msg: '\u26a0 Scheduling conflict in ' + names };
+  const conflicts = findConflicts(screenings);
+  if (conflicts.length > 0) {
+    const msgs = conflicts.map(({ room, reason }) => {
+      const name = cinemaPrettyName(room) || room;
+      if (reason === 'slot')
+        return name + ': same slot double-booked';
+      if (reason === 'time-window:early')
+        return name + ': after-hours event overlaps Early Show window (4\u20137pm)';
+      if (reason === 'time-window:late')
+        return name + ': after-hours event overlaps Late Show window (7\u201310:30pm)';
+      return name + ': conflict';
+    });
+    return { level: 'bad', msg: '\u26a0 ' + msgs.join(' \u00b7 ') };
   }
 
   const total = active.length;
@@ -1064,7 +1119,7 @@ function renderModalScreenings() {
             </div>
           </div>
 
-          <!-- After-hours ticker: only for Rental/Event and Other -->
+          <!-- After-hours ticker + time fields: only for Rental/Event and Other -->
           ${(s.type === 'rental' || s.type === 'other') ? `
           <div class="comp-toggle-row">
             <input type="checkbox" id="afterhours-${idx}" ${s.afterHours?'checked':''}
@@ -1072,6 +1127,25 @@ function renderModalScreenings() {
             <label for="afterhours-${idx}" style="font-size:12px;font-weight:700;color:var(--muted)">
               Outside regular operating hours
             </label>
+          </div>
+          <div id="afterhours-times-${idx}" style="${s.afterHours?'':'display:none'}">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px;">
+              <div>
+                <label class="field-label">Start Time</label>
+                <input type="time" id="slot-start-${idx}" value="${s.slotStart||''}"
+                  oninput="updateTimeField(${idx},'slotStart',this.value)">
+              </div>
+              <div>
+                <label class="field-label">Duration (mins)</label>
+                <input type="number" id="slot-dur-${idx}" value="${s.slotDuration||''}" min="1" max="600" placeholder="e.g. 90"
+                  oninput="updateTimeField(${idx},'slotDuration',this.value)">
+              </div>
+              <div>
+                <label class="field-label">End Time</label>
+                <input type="time" id="slot-end-${idx}" value="${s.slotEnd||''}"
+                  oninput="updateTimeField(${idx},'slotEnd',this.value)">
+              </div>
+            </div>
           </div>` : ''}
 
           <!-- Compilation toggle -->
@@ -1190,8 +1264,45 @@ function updateSlotOrder(idx, val) {
 }
 
 function toggleAfterHoursSlot(idx, isAfterHours) {
-  const wrap = document.getElementById('showslot-wrap-' + idx);
-  if (wrap) wrap.style.display = isAfterHours ? 'none' : '';
+  const wrap  = document.getElementById('showslot-wrap-' + idx);
+  const times = document.getElementById('afterhours-times-' + idx);
+  if (wrap)  wrap.style.display  = isAfterHours ? 'none' : '';
+  if (times) times.style.display = isAfterHours ? ''     : 'none';
+  if (!isAfterHours) {
+    // Clear stored time values when unchecked
+    editingScreenings[idx].slotStart    = '';
+    editingScreenings[idx].slotEnd      = '';
+    editingScreenings[idx].slotDuration = '';
+  }
+  updateConflictSummary();
+}
+
+function updateTimeField(idx, field, value) {
+  editingScreenings[idx][field] = value;
+  const s = editingScreenings[idx];
+
+  // Auto-compute end from start + duration
+  if ((field === 'slotStart' || field === 'slotDuration') && s.slotStart && s.slotDuration) {
+    const [h, m] = s.slotStart.split(':').map(Number);
+    const endMins = h * 60 + m + parseInt(s.slotDuration);
+    const endH = String(Math.floor(endMins / 60) % 24).padStart(2, '0');
+    const endM = String(endMins % 60).padStart(2, '0');
+    const computed = endH + ':' + endM;
+    editingScreenings[idx].slotEnd = computed;
+    const endEl = document.getElementById('slot-end-' + idx);
+    if (endEl) endEl.value = computed;
+  }
+  // Auto-compute duration from start + end
+  if (field === 'slotEnd' && s.slotStart && s.slotEnd) {
+    const [sh, sm] = s.slotStart.split(':').map(Number);
+    const [eh, em] = s.slotEnd.split(':').map(Number);
+    const dur = (eh * 60 + em) - (sh * 60 + sm);
+    if (dur > 0) {
+      editingScreenings[idx].slotDuration = String(dur);
+      const durEl = document.getElementById('slot-dur-' + idx);
+      if (durEl) durEl.value = dur;
+    }
+  }
   updateConflictSummary();
 }
 
@@ -1265,6 +1376,9 @@ function addScreening() {
     slotOrder: nextSlot,
     type,
     afterHours: false,
+    slotStart: '',
+    slotEnd: '',
+    slotDuration: '',
     isCompilation: false,
     compilationTitle: '',
     films: [{ title:'', year:'' }]
@@ -1341,6 +1455,9 @@ function flatRows() {
           type: s.type,
           show_slot: slotLabel(s),
           after_hours: s.afterHours || false,
+          slot_start: s.slotStart || '',
+          slot_end: s.slotEnd || '',
+          slot_duration: s.slotDuration || '',
           is_compilation: s.isCompilation,
           compilation_title: programTitle(s)
         };
@@ -1360,12 +1477,12 @@ function flatRows() {
 function exportScreeningsCSV() {
   const rows = flatRows();
   if (!rows.length) { alert('No data to export'); return; }
-  let csv = 'Date,Day,Cinema,Show Slot,After Hours,Type,Is Compilation,Program Title,Film Title,Year,Film Order\n';
+  let csv = 'Date,Day,Cinema,Show Slot,After Hours,Slot Start,Slot End,Duration (mins),Type,Is Compilation,Program Title,Film Title,Year,Film Order\n';
   rows.forEach(r => {
     csv += [r.date,r.day,r.cinema,r.slot_order,r.type,r.in_window,r.is_compilation,
       `"${(r.compilation_title||'').replace(/"/g,'""')}"`,
       `"${r.film_title.replace(/"/g,'""')}"`,
-      r.show_slot, r.after_hours, r.type, r.is_compilation,
+      r.show_slot, r.after_hours, r.slot_start, r.slot_end, r.slot_duration, r.type, r.is_compilation,
       `"${(r.compilation_title||'').replace(/"/g,'"""')}"`,
       `"${r.film_title.replace(/"/g,'"""')}"`,
       r.film_year, r.film_order].join(',') + '\n';
@@ -1426,20 +1543,43 @@ function dl(content, filename, mime) {
   document.body.removeChild(a);
 }
 
-// Close modal on backdrop click
-document.getElementById('editModal').addEventListener('click', e => {
-  if (e.target === document.getElementById('editModal')) closeModal();
-});
-document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+// ─── Init (runs after DOM + Firebase SDKs are ready) ────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Close modal on backdrop click
+  document.getElementById('editModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('editModal')) closeModal();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-// ─── Init ────────────────────────────────────
-// Show a loading state until Firebase responds
-document.getElementById('calGrid').innerHTML += '<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>';
+  // Firebase init
+  const firebaseConfig = {
+    apiKey: "AIzaSyAV1lNl8LDO1PxQg03oc3cGQ9icCDebqAA",
+    authDomain: "cug-film-scheduler.firebaseapp.com",
+    databaseURL: "https://cug-film-scheduler-default-rtdb.firebaseio.com",
+    projectId: "cug-film-scheduler",
+    storageBucket: "cug-film-scheduler.firebasestorage.app",
+    messagingSenderId: "421768606479",
+    appId: "1:421768606479:web:0e16d19a5edaddc545847a"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  window.CAL_REF = db.ref('calendarData');
 
-// Live listener — fires on connect and whenever any other user saves
-CAL_REF.on('value', snapshot => {
-  calendarData = snapshot.val() || {};
-  renderAll();
+  // Show loading state
+  const grid = document.getElementById('calGrid');
+  const loader = document.createElement('div');
+  loader.id = 'cal-loader';
+  loader.style.cssText = 'grid-column:1/-1;padding:20px;text-align:center;color:var(--muted);font-size:13px;';
+  loader.textContent = 'Loading…';
+  grid.appendChild(loader);
+
+  // Live listener — fires immediately on connect and on every remote save
+  window.CAL_REF.on('value', snapshot => {
+    calendarData = snapshot.val() || {};
+    const l = document.getElementById('cal-loader');
+    if (l) l.remove();
+    renderAll();
+  });
 });
 </script>
 </body>
