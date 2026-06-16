@@ -51,14 +51,14 @@
 
     /* ── Layout ── */
     .layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-direction: column;
       gap: 16px;
       padding: 16px;
-      max-width: 1600px;
+      max-width: 1100px;
       margin: 0 auto;
     }
-    .full { grid-column: 1 / -1; }
+    .full { }
 
     .card {
       background: var(--surface);
@@ -95,7 +95,7 @@
     }
 
     .cal-grid-wrap {
-      max-height: 620px;
+      max-height: 760px;
       overflow-y: auto;
       overflow-x: hidden;
     }
@@ -510,10 +510,6 @@
     .slot-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
     .slot-divider { border: none; border-top: 1px dashed var(--border); margin: 0; }
 
-    @media (max-width: 900px) {
-      .layout { grid-template-columns: 1fr; }
-      .full { grid-column: 1; }
-    }
   </style>
 </head>
 <body>
