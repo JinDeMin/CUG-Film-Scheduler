@@ -94,6 +94,12 @@
       text-align: center;
     }
 
+    .cal-grid-wrap {
+      max-height: 620px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
     .cal-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
@@ -107,6 +113,10 @@
       padding: 4px 0 6px;
       text-transform: uppercase;
       letter-spacing: .04em;
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 2;
     }
     .cal-cell {
       border: 1px solid var(--border);
@@ -539,11 +549,13 @@
         <button class="btn btn-neutral btn-sm" onclick="nextMonth()">→</button>
         <button class="btn btn-neutral btn-sm" onclick="goToday()">Today</button>
       </div>
-      <div class="cal-grid" id="calGrid">
-        <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div>
-        <div class="cal-dow">Tue</div><div class="cal-dow">Wed</div>
-        <div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
-        <div class="cal-dow">Sat</div>
+      <div class="cal-grid-wrap">
+        <div class="cal-grid" id="calGrid">
+          <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div>
+          <div class="cal-dow">Tue</div><div class="cal-dow">Wed</div>
+          <div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
+          <div class="cal-dow">Sat</div>
+        </div>
       </div>
     </div>
   </div>
@@ -946,7 +958,8 @@ function renderScreeningsTable() {
     hdrHTML += '<th>Slot ' + i + ' — Program Title</th>'
       + '<th>Slot ' + i + ' — Films</th>'
       + '<th>Slot ' + i + ' — Type</th>'
-      + '<th>Slot ' + i + ' — Window</th>';
+      + '<th>Slot ' + i + ' — Show</th>'
+      + '<th>Slot ' + i + ' — After Hours</th>';
   }
   hdrHTML += '</tr>';
   thead.innerHTML = hdrHTML;
@@ -962,7 +975,7 @@ function renderScreeningsTable() {
     for (let i = 0; i < maxSlots; i++) {
       const s = slots[i];
       if (!s) {
-        html += '<td></td><td></td><td></td><td></td>';
+        html += '<td></td><td></td><td></td><td></td><td></td>';
         continue;
       }
       const pt = programTitle(s);
