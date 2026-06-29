@@ -49,16 +49,43 @@
     .app-header h1 { font-size: 18px; font-weight: 700; letter-spacing: .02em; }
     .app-header .subtitle { font-size: 12px; opacity: .6; margin-top: 2px; }
 
-    /* ── Layout ── */
+    /* ── Layout / Tabs ── */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px 16px 0;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 5px 5px 0 0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .tab-btn:hover { background: #ece8e2; color: var(--text); }
+    .tab-btn.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
     .layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-direction: column;
       gap: 16px;
       padding: 16px;
-      max-width: 1600px;
+      max-width: 1400px;
       margin: 0 auto;
     }
-    .full { grid-column: 1 / -1; }
+    .full { }
 
     .card {
       background: var(--surface);
@@ -95,7 +122,7 @@
     }
 
     .cal-grid-wrap {
-      max-height: 620px;
+      max-height: 70vh;
       overflow-y: auto;
       overflow-x: hidden;
     }
@@ -275,19 +302,6 @@
       padding: 0;
     }
     .screening-block-head .remove-btn:hover { color: var(--conflict); }
-
-    .dupe-btn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      color: var(--accent2);
-      cursor: pointer;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 7px;
-      opacity: .75;
-    }
-    .dupe-btn:hover { opacity: 1; background: var(--surface2); }
 
     .slot-btn {
       background: var(--surface);
@@ -523,10 +537,33 @@
     .slot-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
     .slot-divider { border: none; border-top: 1px dashed var(--border); margin: 0; }
 
-    @media (max-width: 900px) {
-      .layout { grid-template-columns: 1fr; }
-      .full { grid-column: 1; }
+    .dupe-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--accent2);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      opacity: .75;
     }
+    .dupe-btn:hover { opacity: 1; background: var(--surface2); }
+
+    .dupe-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--accent2);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      opacity: .75;
+    }
+    .dupe-btn:hover { opacity: 1; background: var(--surface2); }
+
+
   </style>
 </head>
 <body>
@@ -538,80 +575,84 @@
   </div>
 </header>
 
-<div class="layout">
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">Calendar View</button>
+  <button class="tab-btn" data-tab="screenings" onclick="switchTab('screenings')">Screenings Table</button>
+  <button class="tab-btn" data-tab="films" onclick="switchTab('films')">Films by Date</button>
+</div>
 
-  <!-- Calendar -->
-  <div class="card">
-    <div class="card-header">
-      Calendar View
-      <span style="font-size:10px;font-weight:400;opacity:.7;">click a day to edit</span>
-    </div>
-    <div class="card-body">
-      <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:var(--regular)"></div> Regular</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--midnight)"></div> Midnight</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--rivoli)"></div> Rivoli</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--rivolirevival)"></div> Rivoli Revival</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--rental)"></div> Rental/Event</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--other)"></div> Other</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--conflict)"></div> Time overlap</div>
-      </div>
-      <div class="cal-controls">
-        <button class="btn btn-neutral btn-sm" onclick="prevMonth()">←</button>
-        <div class="month-label" id="monthLabel"></div>
-        <button class="btn btn-neutral btn-sm" onclick="nextMonth()">→</button>
-        <button class="btn btn-neutral btn-sm" onclick="goToday()">Today</button>
-      </div>
-      <div class="cal-grid-wrap">
-        <div class="cal-grid" id="calGrid">
-          <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div>
-          <div class="cal-dow">Tue</div><div class="cal-dow">Wed</div>
-          <div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
-          <div class="cal-dow">Sat</div>
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">Calendar View</button>
+  <button class="tab-btn" data-tab="screenings" onclick="switchTab('screenings')">Screenings Table</button>
+  <button class="tab-btn" data-tab="films" onclick="switchTab('films')">Films by Date</button>
+</div>
+
+<div class="layout">
+  <div class="tab-panel active" id="tab-calendar">
+    <div class="card">
+      <div class="card-header">Calendar View <span style="font-size:10px;font-weight:400;opacity:.7;">click a day to edit</span></div>
+      <div class="card-body">
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--regular)"></div> Regular</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--midnight)"></div> Midnight</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--rivoli)"></div> Rivoli</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--rivolirevival)"></div> Rivoli Revival</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--rental)"></div> Rental/Event</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--other)"></div> Other</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--conflict)"></div> Conflict</div>
+        </div>
+        <div class="cal-controls">
+          <button class="btn btn-neutral btn-sm" onclick="prevMonth()">&larr;</button>
+          <div class="month-label" id="monthLabel"></div>
+          <button class="btn btn-neutral btn-sm" onclick="nextMonth()">&rarr;</button>
+          <button class="btn btn-neutral btn-sm" onclick="goToday()">Today</button>
+        </div>
+        <div class="cal-grid-wrap">
+          <div class="cal-grid" id="calGrid">
+            <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div>
+            <div class="cal-dow">Tue</div><div class="cal-dow">Wed</div>
+            <div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
+            <div class="cal-dow">Sat</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Screenings Table -->
-  <div class="card">
-    <div class="card-header">Screenings Table</div>
-    <div class="card-body">
-      <div class="export-bar">
-        <button class="btn btn-neutral btn-sm" onclick="exportScreeningsCSV()">Export CSV</button>
-        <button class="btn btn-neutral btn-sm" onclick="exportScreeningsJSON()">Export JSON</button>
-        <button class="btn btn-danger btn-sm" onclick="clearAll()">Clear All</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead id="screeningsThead"><tr>
-              <th>Date</th>
-              <th>Day</th>
-              <th>Cinema</th>
-            </tr></thead>
-          <tbody id="screeningsTbody"></tbody>
-        </table>
+  <div class="tab-panel" id="tab-screenings">
+    <div class="card">
+      <div class="card-header">Screenings Table</div>
+      <div class="card-body">
+        <div class="export-bar">
+          <button class="btn btn-neutral btn-sm" onclick="exportScreeningsCSV()">Export CSV</button>
+          <button class="btn btn-neutral btn-sm" onclick="exportScreeningsJSON()">Export JSON</button>
+          <button class="btn btn-danger btn-sm" onclick="clearAll()">Clear All</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="screeningsThead"><tr><th>Date</th><th>Day</th><th>Cinema</th></tr></thead>
+            <tbody id="screeningsTbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
-
-  <!-- Films Table -->
-  <div class="card full">
-    <div class="card-header">Films by Date</div>
-    <div class="card-body">
-      <div class="export-bar">
-        <button class="btn btn-neutral btn-sm" onclick="exportFilmsCSV()">Export Films CSV</button>
-        <button class="btn btn-neutral btn-sm" onclick="exportFilmsJSON()">Export Films JSON</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead id="filmsThead"><tr><th>Film</th><th>Year</th></tr></thead>
-          <tbody id="filmsTbody"></tbody>
-        </table>
+  <div class="tab-panel" id="tab-films">
+    <div class="card">
+      <div class="card-header">Films by Date</div>
+      <div class="card-body">
+        <div class="export-bar">
+          <button class="btn btn-neutral btn-sm" onclick="exportFilmsCSV()">Export Films CSV</button>
+          <button class="btn btn-neutral btn-sm" onclick="exportFilmsJSON()">Export Films JSON</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="filmsThead"><tr><th>Film</th><th>Year</th></tr></thead>
+            <tbody id="filmsTbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
-
 </div>
 
 <!-- ═══════════════ EDIT MODAL ═══════════════ -->
@@ -658,7 +699,7 @@
   <div class="modal-box" style="max-width:400px;">
     <div class="modal-head">
       <span>Duplicate Screening</span>
-      <button onclick="closeDupeModal()">✕</button>
+      <button onclick="closeDupeModal()">&#x2715;</button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
       <div style="font-size:13px;color:var(--muted);" id="dupeDesc"></div>
@@ -689,6 +730,8 @@
     </div>
   </div>
 </div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
@@ -802,9 +845,10 @@ function effectiveSlot(s) {
 // Returns array of conflict descriptor objects: { room, reason }
 function findConflicts(screenings) {
   const conflicts = [];
-  const addConflict = (room, reason) => {
-    if (!conflicts.find(c => c.room === room && c.reason === reason))
-      conflicts.push({ room, reason });
+  const addConflict = (room, reason, detail) => {
+    const key = room + '::' + reason + '::' + (detail||'');
+    if (!conflicts.find(c => c.key === key))
+      conflicts.push({ room, reason, detail: detail||'', key });
   };
 
   // ── Type 1: slot conflicts (non-after-hours) ──
@@ -820,8 +864,13 @@ function findConflicts(screenings) {
     for (let i = 0; i < entries.length; i++) {
       for (let j = i + 1; j < entries.length; j++) {
         const a = entries[i].slot, b = entries[j].slot;
-        if (a === 'exclusive' || b === 'exclusive' || a === b)
-          addConflict(room, 'slot');
+        if (a === 'exclusive' || b === 'exclusive' || a === b) {
+          const tA = programTitle(entries[i].s) || '(untitled)';
+          const tB = programTitle(entries[j].s) || '(untitled)';
+          const sn = (a === b && (a === 'early' || a === 'late')) ? (a === 'early' ? 'Early Show' : 'Late Show') : 'same slot';
+          const tr = (a === b) ? slotTimeRange(a) : '';
+          addConflict(room, 'slot', tA + ' × ' + tB + ' — both ' + sn + (tr ? ' (' + tr + ')' : ''));
+        }
       }
     }
   }
@@ -851,7 +900,11 @@ function findConflicts(screenings) {
       const winEnd   = slot === 'early' ? EARLY_END   : LATE_END;
       // Overlap if ranges intersect
       if (ahStart < winEnd && ahEnd > winStart) {
-        addConflict(room, 'time-window:' + slot);
+        const ahT = programTitle(ah) || '(untitled)';
+        const ahR = fmtTime12From(ahStart) + '–' + fmtTime12From(ahEnd);
+        const sT = programTitle(s) || '(untitled)';
+        const sn2 = slot === 'early' ? 'Early Show' : 'Late Show';
+        addConflict(room, 'time-window:' + slot, ahT + ' (' + ahR + ') overlaps ' + sT + ' — ' + sn2 + ' (' + slotTimeRange(slot) + ')');
       }
     });
   });
@@ -1155,7 +1208,7 @@ function renderModalScreenings() {
         <div class="screening-block-head">
           <span class="scr-num">${slotLabel(s)}</span>
           <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
-            <button class="dupe-btn" onclick="duplicateScreening(${idx})" title="Duplicate to new slot">⧉ Duplicate</button>
+            <button class="dupe-btn" onclick="duplicateScreening(${idx})" title="Duplicate">&#x29C9; Duplicate</button>
             <button class="remove-btn" onclick="removeScreening(${idx})" title="Remove">✕</button>
           </div>
         </div>
@@ -1452,19 +1505,39 @@ function addScreening() {
   list.lastElementChild?.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
-function removeScreening(idx) {
-  editingScreenings.splice(idx, 1);
-  renderModalScreenings();
+// ─── Tabs ─────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector('.tab-btn[data-tab="' + name + '"]').classList.add('active');
 }
 
-let dupeSourceIdx = null; // index in editingScreenings being duplicated
+function syncCinemaToType(type) {
+  const map = { rivoli:'Rivoli', rivolirevival:'RivoliRevival' };
+  const sel = document.getElementById('newScreeningCinema');
+  if (map[type]) sel.value = map[type];
+}
+
+function fmtTime12From(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12  = h % 12 || 12;
+  return h12 + (m ? ':' + String(m).padStart(2,'0') : '') + ' ' + ampm;
+}
+function slotTimeRange(slot) {
+  if (slot === 'early') return fmtTime12From(EARLY_START) + '–' + fmtTime12From(EARLY_END);
+  if (slot === 'late')  return fmtTime12From(LATE_START)  + '–' + fmtTime12From(LATE_END);
+  return '';
+}
+
+let dupeSourceIdx = null;
 
 function duplicateScreening(idx) {
   dupeSourceIdx = idx;
   const s = editingScreenings[idx];
   const title = programTitle(s) || '(untitled)';
-  document.getElementById('dupeDesc').textContent = '"' + title + '" — choose where to duplicate it:';
-  // Reset to same-day default
+  document.getElementById('dupeDesc').textContent = '"' + title + '" — choose where to duplicate:';
   document.querySelector('input[name="dupeTarget"][value="sameday"]').checked = true;
   document.getElementById('dupeDateWrap').style.display = 'none';
   document.getElementById('dupeDateInput').value = '';
@@ -1486,53 +1559,34 @@ function confirmDuplicate() {
   const src  = editingScreenings[dupeSourceIdx];
   const dupe = JSON.parse(JSON.stringify(src));
   const mode = document.querySelector('input[name="dupeTarget"]:checked').value;
-
   if (mode === 'sameday') {
-    // Same day: bump slot order and insert adjacent
-    const siblingsInCinema = editingScreenings.filter(s => s.cinema === src.cinema);
-    const maxSlot = Math.max(...siblingsInCinema.map(s => s.slotOrder || 1));
-    dupe.slotOrder = maxSlot + 1;
+    const sibs = editingScreenings.filter(s => s.cinema === src.cinema);
+    dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
     editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
     closeDupeModal();
     renderModalScreenings();
     setTimeout(() => {
-      const newBlock = document.getElementById('scr-block-' + (dupeSourceIdx + 1));
-      if (newBlock) newBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const nb = document.getElementById('scr-block-' + (dupeSourceIdx + 1));
+      if (nb) nb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 50);
-
   } else {
-    // Different date: save to calendarData directly, don't touch editingScreenings
     const targetDate = document.getElementById('dupeDateInput').value;
     if (!targetDate) { alert('Please pick a target date.'); return; }
     if (targetDate === editingDate) {
-      // Same date — treat as same-day duplicate
-      const siblingsInCinema = editingScreenings.filter(s => s.cinema === src.cinema);
-      const maxSlot = Math.max(...siblingsInCinema.map(s => s.slotOrder || 1));
-      dupe.slotOrder = maxSlot + 1;
+      const sibs = editingScreenings.filter(s => s.cinema === src.cinema);
+      dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
       editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
-      closeDupeModal();
-      renderModalScreenings();
-      return;
+      closeDupeModal(); renderModalScreenings(); return;
     }
-    // Copy into target date's screenings (merge, don't overwrite)
     const existing = JSON.parse(JSON.stringify(calendarData[targetDate] || []));
-    const siblingsInCinema = existing.filter(s => s.cinema === src.cinema);
-    const maxSlot = siblingsInCinema.length > 0
-      ? Math.max(...siblingsInCinema.map(s => s.slotOrder || 1)) + 1
-      : 1;
-    dupe.slotOrder = maxSlot;
+    const sibs = existing.filter(s => s.cinema === src.cinema);
+    dupe.slotOrder = sibs.length > 0 ? Math.max(...sibs.map(s => s.slotOrder || 1)) + 1 : 1;
     existing.push(dupe);
     calendarData[targetDate] = existing;
-    save();
-    renderAll();
-    closeDupeModal();
-
-    // Brief confirmation flash on the target calendar cell
-    const ds = targetDate;
+    save(); renderAll(); closeDupeModal();
     setTimeout(() => {
-      const cells = document.querySelectorAll('.cal-cell');
-      cells.forEach(cell => {
-        if (cell.dataset.date === ds) {
+      document.querySelectorAll('.cal-cell').forEach(cell => {
+        if (cell.dataset.date === targetDate) {
           cell.style.outline = '2px solid var(--ok)';
           setTimeout(() => { cell.style.outline = ''; }, 1200);
         }
@@ -1541,14 +1595,27 @@ function confirmDuplicate() {
   }
 }
 
+function removeScreening(idx) {
+  editingScreenings.splice(idx, 1);
+  renderModalScreenings();
+}
+
 function updateConflictSummary() {
   const el = document.getElementById('conflictSummary');
-  const { level, msg } = conflictMessage(editingScreenings);
+  const { level, msg, lines } = conflictMessage(editingScreenings);
   el.className = 'conflict-summary';
   if (level === 'none') { el.style.display='none'; return; }
   el.style.display='block';
   el.classList.add('show', level === 'bad' ? 'bad' : 'ok');
-  el.textContent = msg;
+  if (lines && lines.length > 0) {
+    let html = '<div style="font-weight:700;margin-bottom:4px;">' + msg + '</div>';
+    html += '<ul style="margin:0;padding-left:18px;">';
+    lines.forEach(l => { html += '<li style="margin-bottom:2px;">' + l + '</li>'; });
+    html += '</ul>';
+    el.innerHTML = html;
+  } else {
+    el.textContent = msg;
+  }
 }
 
 function saveDay() {
@@ -1627,13 +1694,12 @@ function exportScreeningsCSV() {
   if (!rows.length) { alert('No data to export'); return; }
   let csv = 'Date,Day,Cinema,Show Slot,After Hours,Slot Start,Slot End,Duration (mins),Type,Is Compilation,Program Title,Film Title,Year,Film Order\n';
   rows.forEach(r => {
-    csv += [r.date,r.day,r.cinema,r.slot_order,r.type,r.in_window,r.is_compilation,
-      `"${(r.compilation_title||'').replace(/"/g,'""')}"`,
-      `"${r.film_title.replace(/"/g,'""')}"`,
-      r.show_slot, r.after_hours, r.slot_start, r.slot_end, r.slot_duration, r.type, r.is_compilation,
-      `"${(r.compilation_title||'').replace(/"/g,'"""')}"`,
-      `"${r.film_title.replace(/"/g,'"""')}"`,
-      r.film_year, r.film_order].join(',') + '\n';
+    csv += [r.date, r.day, r.cinema, r.show_slot, r.after_hours,
+      r.slot_start, r.slot_end, r.slot_duration, r.type, r.is_compilation,
+      '"' + (r.compilation_title||'').replace(/"/g,'""') + '"',
+      '"' + r.film_title.replace(/"/g,'""') + '"',
+      r.film_year, r.film_order].join(',') + '
+';
   });
   dl(csv, 'screenings.csv', 'text/csv');
 }
@@ -1700,7 +1766,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('dupeModal').addEventListener('click', e => {
     if (e.target === document.getElementById('dupeModal')) closeDupeModal();
   });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDupeModal(); } });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeModal(); closeDupeModal(); }
+  });
 
   // Firebase init
   const firebaseConfig = {
