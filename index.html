@@ -51,45 +51,14 @@
 
     /* ── Layout ── */
     .layout {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 16px;
       padding: 16px;
-      max-width: 1300px;
+      max-width: 1600px;
       margin: 0 auto;
     }
-    .full { }
-
-    .tab-bar {
-      display: flex;
-      gap: 4px;
-      max-width: 1300px;
-      margin: 0 auto;
-      padding: 16px 16px 0;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 10px 16px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-bottom: none;
-      border-radius: 5px 5px 0 0;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: .03em;
-      text-transform: uppercase;
-      color: var(--muted);
-      cursor: pointer;
-      transition: background .15s, color .15s;
-    }
-    .tab-btn:hover { background: #ece8e2; color: var(--text); }
-    .tab-btn.active {
-      background: var(--accent2);
-      color: #fff;
-      border-color: var(--accent2);
-    }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
+    .full { grid-column: 1 / -1; }
 
     .card {
       background: var(--surface);
@@ -126,7 +95,7 @@
     }
 
     .cal-grid-wrap {
-      max-height: 70vh;
+      max-height: 620px;
       overflow-y: auto;
       overflow-x: hidden;
     }
@@ -306,6 +275,19 @@
       padding: 0;
     }
     .screening-block-head .remove-btn:hover { color: var(--conflict); }
+
+    .dupe-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--accent2);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      opacity: .75;
+    }
+    .dupe-btn:hover { opacity: 1; background: var(--surface2); }
 
     .slot-btn {
       background: var(--surface);
@@ -541,6 +523,10 @@
     .slot-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
     .slot-divider { border: none; border-top: 1px dashed var(--border); margin: 0; }
 
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .full { grid-column: 1; }
+    }
   </style>
 </head>
 <body>
@@ -552,16 +538,9 @@
   </div>
 </header>
 
-<div class="tab-bar">
-  <button class="tab-btn active" data-tab="calendar" onclick="switchTab('calendar')">Calendar View</button>
-  <button class="tab-btn" data-tab="screenings" onclick="switchTab('screenings')">Screenings Table</button>
-  <button class="tab-btn" data-tab="films" onclick="switchTab('films')">Films by Date</button>
-</div>
-
 <div class="layout">
 
   <!-- Calendar -->
-  <div class="tab-panel active" id="tab-calendar">
   <div class="card">
     <div class="card-header">
       Calendar View
@@ -593,10 +572,8 @@
       </div>
     </div>
   </div>
-  </div>
 
   <!-- Screenings Table -->
-  <div class="tab-panel" id="tab-screenings">
   <div class="card">
     <div class="card-header">Screenings Table</div>
     <div class="card-body">
@@ -617,10 +594,8 @@
       </div>
     </div>
   </div>
-  </div>
 
   <!-- Films Table -->
-  <div class="tab-panel" id="tab-films">
   <div class="card full">
     <div class="card-header">Films by Date</div>
     <div class="card-body">
@@ -635,7 +610,6 @@
         </table>
       </div>
     </div>
-  </div>
   </div>
 
 </div>
@@ -679,7 +653,42 @@
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<!-- ═══════════════ DUPLICATE MODAL ═══════════════ -->
+<div class="modal-overlay" id="dupeModal">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-head">
+      <span>Duplicate Screening</span>
+      <button onclick="closeDupeModal()">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:13px;color:var(--muted);" id="dupeDesc"></div>
+      <div>
+        <label class="field-label">Duplicate to</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="radio" name="dupeTarget" value="sameday" checked onchange="toggleDupeDatePicker()">
+            Same day (new slot)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="radio" name="dupeTarget" value="otherday" onchange="toggleDupeDatePicker()">
+            A different date
+          </label>
+        </div>
+      </div>
+      <div id="dupeDateWrap" style="display:none;">
+        <label class="field-label">Target Date</label>
+        <input type="date" id="dupeDateInput" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:3px;font-size:13px;">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div></div>
+      <div class="modal-footer-right">
+        <button class="btn btn-neutral btn-sm" onclick="closeDupeModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="confirmDuplicate()">Duplicate</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
@@ -744,14 +753,6 @@ function slotLabel(s) {
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS = ['January','February','March','April','May','June',
                 'July','August','September','October','November','December'];
-
-// ─── Tabs ────────────────────────────────────
-function switchTab(name) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  document.querySelector('.tab-btn[data-tab="' + name + '"]').classList.add('active');
-}
 
 // ─── Persistence ────────────────────────────
 // save() pushes the full calendarData object to Firebase
@@ -909,6 +910,7 @@ function renderCalendar() {
     const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const cell = document.createElement('div');
     cell.className = 'cal-cell';
+    cell.dataset.date = ds;
     cell.onclick = () => openModal(ds);
 
     const scrns = calendarData[ds] || [];
@@ -1152,8 +1154,10 @@ function renderModalScreenings() {
       block.innerHTML = `
         <div class="screening-block-head">
           <span class="scr-num">${slotLabel(s)}</span>
-
-          <button class="remove-btn" onclick="removeScreening(${idx})" title="Remove">✕</button>
+          <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
+            <button class="dupe-btn" onclick="duplicateScreening(${idx})" title="Duplicate to new slot">⧉ Duplicate</button>
+            <button class="remove-btn" onclick="removeScreening(${idx})" title="Remove">✕</button>
+          </div>
         </div>
         <div class="screening-block-body">
           <!-- Row: type + show slot (Early/Late where applicable) -->
@@ -1453,6 +1457,90 @@ function removeScreening(idx) {
   renderModalScreenings();
 }
 
+let dupeSourceIdx = null; // index in editingScreenings being duplicated
+
+function duplicateScreening(idx) {
+  dupeSourceIdx = idx;
+  const s = editingScreenings[idx];
+  const title = programTitle(s) || '(untitled)';
+  document.getElementById('dupeDesc').textContent = '"' + title + '" — choose where to duplicate it:';
+  // Reset to same-day default
+  document.querySelector('input[name="dupeTarget"][value="sameday"]').checked = true;
+  document.getElementById('dupeDateWrap').style.display = 'none';
+  document.getElementById('dupeDateInput').value = '';
+  document.getElementById('dupeModal').classList.add('open');
+}
+
+function closeDupeModal() {
+  document.getElementById('dupeModal').classList.remove('open');
+  dupeSourceIdx = null;
+}
+
+function toggleDupeDatePicker() {
+  const val = document.querySelector('input[name="dupeTarget"]:checked').value;
+  document.getElementById('dupeDateWrap').style.display = val === 'otherday' ? '' : 'none';
+}
+
+function confirmDuplicate() {
+  if (dupeSourceIdx === null) return;
+  const src  = editingScreenings[dupeSourceIdx];
+  const dupe = JSON.parse(JSON.stringify(src));
+  const mode = document.querySelector('input[name="dupeTarget"]:checked').value;
+
+  if (mode === 'sameday') {
+    // Same day: bump slot order and insert adjacent
+    const siblingsInCinema = editingScreenings.filter(s => s.cinema === src.cinema);
+    const maxSlot = Math.max(...siblingsInCinema.map(s => s.slotOrder || 1));
+    dupe.slotOrder = maxSlot + 1;
+    editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
+    closeDupeModal();
+    renderModalScreenings();
+    setTimeout(() => {
+      const newBlock = document.getElementById('scr-block-' + (dupeSourceIdx + 1));
+      if (newBlock) newBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+
+  } else {
+    // Different date: save to calendarData directly, don't touch editingScreenings
+    const targetDate = document.getElementById('dupeDateInput').value;
+    if (!targetDate) { alert('Please pick a target date.'); return; }
+    if (targetDate === editingDate) {
+      // Same date — treat as same-day duplicate
+      const siblingsInCinema = editingScreenings.filter(s => s.cinema === src.cinema);
+      const maxSlot = Math.max(...siblingsInCinema.map(s => s.slotOrder || 1));
+      dupe.slotOrder = maxSlot + 1;
+      editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
+      closeDupeModal();
+      renderModalScreenings();
+      return;
+    }
+    // Copy into target date's screenings (merge, don't overwrite)
+    const existing = JSON.parse(JSON.stringify(calendarData[targetDate] || []));
+    const siblingsInCinema = existing.filter(s => s.cinema === src.cinema);
+    const maxSlot = siblingsInCinema.length > 0
+      ? Math.max(...siblingsInCinema.map(s => s.slotOrder || 1)) + 1
+      : 1;
+    dupe.slotOrder = maxSlot;
+    existing.push(dupe);
+    calendarData[targetDate] = existing;
+    save();
+    renderAll();
+    closeDupeModal();
+
+    // Brief confirmation flash on the target calendar cell
+    const ds = targetDate;
+    setTimeout(() => {
+      const cells = document.querySelectorAll('.cal-cell');
+      cells.forEach(cell => {
+        if (cell.dataset.date === ds) {
+          cell.style.outline = '2px solid var(--ok)';
+          setTimeout(() => { cell.style.outline = ''; }, 1200);
+        }
+      });
+    }, 100);
+  }
+}
+
 function updateConflictSummary() {
   const el = document.getElementById('conflictSummary');
   const { level, msg } = conflictMessage(editingScreenings);
@@ -1609,7 +1697,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('editModal').addEventListener('click', e => {
     if (e.target === document.getElementById('editModal')) closeModal();
   });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  document.getElementById('dupeModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('dupeModal')) closeDupeModal();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDupeModal(); } });
 
   // Firebase init
   const firebaseConfig = {
