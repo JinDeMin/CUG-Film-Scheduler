@@ -1680,8 +1680,7 @@ function exportScreeningsCSV() {
       r.slot_start, r.slot_end, r.slot_duration, r.type, r.is_compilation,
       '"' + (r.compilation_title||'').replace(/"/g,'""') + '"',
       '"' + r.film_title.replace(/"/g,'""') + '"',
-      r.film_year, r.film_order].join(',') + '
-';
+      r.film_year, r.film_order].join(',') + '\n';
   });
   dl(csv, 'screenings.csv', 'text/csv');
 }
