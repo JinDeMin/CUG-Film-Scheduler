@@ -1539,11 +1539,18 @@ function toggleDupeDatePicker() {
 function confirmDuplicate() {
   if (dupeSourceIdx === null) return;
   const src  = editingScreenings[dupeSourceIdx];
-  const dupe = JSON.parse(JSON.stringify(src));
+  const dupe = JSON.parse(JSON.stringify(src)); // keeps src.slotOrder (Early/Late) intact
   const mode = document.querySelector('input[name="dupeTarget"]:checked').value;
+
   if (mode === 'sameday') {
-    const sibs = editingScreenings.filter(s => s.cinema === src.cinema);
-    dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
+    // Same day: must use a different slot than the source, since same cinema+slot = conflict.
+    // Default to the other slot (Early<->Late) if the source has one; otherwise next available.
+    if (MULTI_SLOT_TYPES.has(src.type) && src.type !== 'rivolirevival' && !src.afterHours) {
+      dupe.slotOrder = (src.slotOrder || 1) === 1 ? 2 : 1;
+    } else {
+      const sibs = editingScreenings.filter(s => s.cinema === src.cinema);
+      dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
+    }
     editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
     closeDupeModal();
     renderModalScreenings();
@@ -1554,15 +1561,31 @@ function confirmDuplicate() {
   } else {
     const targetDate = document.getElementById('dupeDateInput').value;
     if (!targetDate) { alert('Please pick a target date.'); return; }
+
     if (targetDate === editingDate) {
-      const sibs = editingScreenings.filter(s => s.cinema === src.cinema);
-      dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
+      // Same as "sameday" case
+      if (MULTI_SLOT_TYPES.has(src.type) && src.type !== 'rivolirevival' && !src.afterHours) {
+        dupe.slotOrder = (src.slotOrder || 1) === 1 ? 2 : 1;
+      } else {
+        const sibs = editingScreenings.filter(s => s.cinema === src.cinema);
+        dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
+      }
       editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
       closeDupeModal(); renderModalScreenings(); return;
     }
+
+    // Different date: preserve the source's own slotOrder (Early/Late/Single) by default.
+    // Only bump to the next free slot if that exact cinema+slot is already taken on the target day.
     const existing = JSON.parse(JSON.stringify(calendarData[targetDate] || []));
-    const sibs = existing.filter(s => s.cinema === src.cinema);
-    dupe.slotOrder = sibs.length > 0 ? Math.max(...sibs.map(s => s.slotOrder || 1)) + 1 : 1;
+    const slotTaken = existing.some(s =>
+      s.cinema === src.cinema && (s.slotOrder || 1) === (dupe.slotOrder || 1)
+    );
+    if (slotTaken) {
+      const sibs = existing.filter(s => s.cinema === src.cinema);
+      dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
+    }
+    // else: dupe.slotOrder already matches src.slotOrder — leave it as-is
+
     existing.push(dupe);
     calendarData[targetDate] = existing;
     save(); renderAll(); closeDupeModal();
