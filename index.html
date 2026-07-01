@@ -192,6 +192,15 @@
     .chip.other      { background: var(--other); }
     .chip.conflict-chip { background: var(--conflict); }
 
+    .chip[draggable="true"] { cursor: grab; }
+    .chip[draggable="true"]:active { cursor: grabbing; opacity: .6; }
+    .cal-cell.drag-over {
+      border-color: var(--accent2);
+      box-shadow: 0 0 0 2px var(--accent2);
+      background: #e8eaf6;
+    }
+    .cal-cell.drag-source { opacity: .5; }
+
     .conflict-badge {
       position: absolute;
       top: 4px;
@@ -933,6 +942,101 @@ function conflictMessage(screenings) {
   return { level: 'ok', msg: '\u2713 ' + total + ' screening' + (total > 1 ? 's' : '') + ' \u2014 no conflicts' };
 }
 
+
+// ─── Drag & Drop ─────────────────────────────
+let dragSrcDate = null;
+let dragSrcIdx  = null;
+let isDragging  = false;
+
+function onChipDragStart(e) {
+  isDragging = true;
+  dragSrcDate = e.currentTarget.dataset.srcDate;
+  dragSrcIdx  = parseInt(e.currentTarget.dataset.srcIdx);
+  e.currentTarget.closest('.cal-cell').classList.add('drag-source');
+  e.dataTransfer.effectAllowed = 'move';
+  // Encode as JSON for cross-browser compat
+  e.dataTransfer.setData('text/plain', JSON.stringify({ date: dragSrcDate, idx: dragSrcIdx }));
+  // Clear drag state after a tick (needed for Firefox)
+  setTimeout(() => { isDragging = false; }, 0);
+}
+
+function onCellDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onCellDragLeave(e) {
+  // Only remove highlight if leaving the cell entirely (not just crossing into a child)
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+}
+
+function onCellDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const targetCell = e.currentTarget;
+  targetCell.classList.remove('drag-over');
+
+  // Recover source info
+  let srcDate, srcIdx;
+  try {
+    const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+    srcDate = payload.date;
+    srcIdx  = payload.idx;
+  } catch {
+    srcDate = dragSrcDate;
+    srcIdx  = dragSrcIdx;
+  }
+
+  const targetDate = targetCell.dataset.date;
+  if (!targetDate || !srcDate) return;
+
+  // Remove drag-source highlight
+  document.querySelectorAll('.drag-source').forEach(el => el.classList.remove('drag-source'));
+
+  // Moving to the same cell — no-op
+  if (srcDate === targetDate) return;
+
+  // Pull the screening out of source
+  const srcList = JSON.parse(JSON.stringify(calendarData[srcDate] || []));
+  if (srcIdx >= srcList.length) return;
+  const moving = srcList.splice(srcIdx, 1)[0];
+
+  // Add to target, preserving slotOrder if slot is free there, otherwise bump
+  const tgtList = JSON.parse(JSON.stringify(calendarData[targetDate] || []));
+  const slotTaken = tgtList.some(s =>
+    s.cinema === moving.cinema && (s.slotOrder || 1) === (moving.slotOrder || 1)
+  );
+  if (slotTaken) {
+    const sibs = tgtList.filter(s => s.cinema === moving.cinema);
+    moving.slotOrder = sibs.length > 0 ? Math.max(...sibs.map(s => s.slotOrder || 1)) + 1 : 1;
+  }
+  tgtList.push(moving);
+
+  // Commit
+  if (srcList.length > 0) {
+    calendarData[srcDate] = srcList;
+  } else {
+    delete calendarData[srcDate];
+  }
+  calendarData[targetDate] = tgtList;
+
+  save();
+  renderAll();
+
+  // Flash the target cell green
+  setTimeout(() => {
+    document.querySelectorAll('.cal-cell').forEach(cell => {
+      if (cell.dataset.date === targetDate) {
+        cell.style.outline = '2px solid var(--ok)';
+        setTimeout(() => { cell.style.outline = ''; }, 900);
+      }
+    });
+  }, 50);
+}
+
 // ─── Calendar render ─────────────────────────
 function renderCalendar() {
   const y = currentDate.getFullYear();
@@ -956,7 +1060,7 @@ function renderCalendar() {
     const cell = document.createElement('div');
     cell.className = 'cal-cell';
     cell.dataset.date = ds;
-    cell.onclick = () => openModal(ds);
+    cell.onclick = (e) => { if (e.target.closest('[draggable]')) return; openModal(ds); };
 
     const scrns = calendarData[ds] || [];
 
@@ -974,19 +1078,46 @@ function renderCalendar() {
       }
     }
 
-    let html = `<div class="cal-day-num">${d}</div><div class="cal-chips">`;
-    scrns.slice(0, 5).forEach(s => {
+    // Day number + chips
+    const dayNum = document.createElement('div');
+    dayNum.className = 'cal-day-num';
+    dayNum.textContent = d;
+    cell.appendChild(dayNum);
+
+    const chipsWrap = document.createElement('div');
+    chipsWrap.className = 'cal-chips';
+
+    scrns.slice(0, 5).forEach((s, sIdx) => {
       const displayTitle = s.isCompilation && s.compilationTitle
         ? s.compilationTitle
         : (s.films[0]?.title || '(untitled)');
       const afterTag = (s.afterHours || s.type === 'midnight') ? ' ★' : '';
       const slotTag = s.type !== 'midnight' ? ' ' + slotLabel(s) : ' After Hours';
-      const label = `[${s.cinema} ${slotTag.trim()}${afterTag}] ${displayTitle.substring(0,18)}`;
-      html += `<div class="chip ${s.type}">${label}</div>`;
+      const label = '[' + s.cinema + ' ' + slotTag.trim() + afterTag + '] ' + displayTitle.substring(0, 18);
+      const chip = document.createElement('div');
+      chip.className = 'chip ' + s.type;
+      chip.textContent = label;
+      chip.draggable = true;
+      chip.dataset.srcDate = ds;
+      chip.dataset.srcIdx  = sIdx;
+      chip.addEventListener('dragstart', onChipDragStart);
+      chip.addEventListener('click', e => e.stopPropagation()); // chip click doesn't open modal
+      chipsWrap.appendChild(chip);
     });
-    if (scrns.length > 5) html += `<div class="chip other">+${scrns.length-5} more</div>`;
-    html += '</div>';
-    cell.innerHTML += html;
+
+    if (scrns.length > 5) {
+      const more = document.createElement('div');
+      more.className = 'chip other';
+      more.textContent = '+' + (scrns.length - 5) + ' more';
+      chipsWrap.appendChild(more);
+    }
+
+    cell.appendChild(chipsWrap);
+
+    // Drop zone events on the cell itself
+    cell.addEventListener('dragover',  onCellDragOver);
+    cell.addEventListener('dragleave', onCellDragLeave);
+    cell.addEventListener('drop',      onCellDrop);
     grid.appendChild(cell);
   }
 }
