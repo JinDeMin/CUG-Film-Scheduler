@@ -954,9 +954,11 @@ function onChipDragStart(e) {
   dragSrcIdx  = parseInt(e.currentTarget.dataset.srcIdx);
   e.currentTarget.closest('.cal-cell').classList.add('drag-source');
   e.dataTransfer.effectAllowed = 'move';
-  // Encode as JSON for cross-browser compat
-  e.dataTransfer.setData('text/plain', JSON.stringify({ date: dragSrcDate, idx: dragSrcIdx }));
-  // Clear drag state after a tick (needed for Firefox)
+  e.dataTransfer.setData('text/plain', JSON.stringify({
+    date:    dragSrcDate,
+    idx:     dragSrcIdx,
+    payload: JSON.parse(e.currentTarget.dataset.srcData)
+  }));
   setTimeout(() => { isDragging = false; }, 0);
 }
 
@@ -967,7 +969,6 @@ function onCellDragOver(e) {
 }
 
 function onCellDragLeave(e) {
-  // Only remove highlight if leaving the cell entirely (not just crossing into a child)
   if (!e.currentTarget.contains(e.relatedTarget)) {
     e.currentTarget.classList.remove('drag-over');
   }
@@ -979,43 +980,35 @@ function onCellDrop(e) {
   const targetCell = e.currentTarget;
   targetCell.classList.remove('drag-over');
 
-  // Recover source info
-  let srcDate, srcIdx;
+  let srcDate, moving;
   try {
-    const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
-    srcDate = payload.date;
-    srcIdx  = payload.idx;
+    const parsed = JSON.parse(e.dataTransfer.getData('text/plain'));
+    srcDate = parsed.date;
+    moving  = JSON.parse(JSON.stringify(parsed.payload));
   } catch {
-    srcDate = dragSrcDate;
-    srcIdx  = dragSrcIdx;
+    return;
   }
 
   const targetDate = targetCell.dataset.date;
   if (!targetDate || !srcDate) return;
-
-  // Remove drag-source highlight
   document.querySelectorAll('.drag-source').forEach(el => el.classList.remove('drag-source'));
-
-  // Moving to the same cell — no-op
   if (srcDate === targetDate) return;
 
-  // Pull the screening out of source
+  // Remove the exact screening from source by deep-matching the object
   const srcList = JSON.parse(JSON.stringify(calendarData[srcDate] || []));
-  if (srcIdx >= srcList.length) return;
-  const moving = srcList.splice(srcIdx, 1)[0];
+  const removeIdx = srcList.findIndex(s => JSON.stringify(s) === JSON.stringify(moving));
+  if (removeIdx === -1) return;
+  srcList.splice(removeIdx, 1);
 
-  // Add to target, preserving slotOrder if slot is free there, otherwise bump
+  // Add to target — preserve slot exactly, only bump on genuine conflict
   const tgtList = JSON.parse(JSON.stringify(calendarData[targetDate] || []));
-  const slotTaken = tgtList.some(s =>
-    s.cinema === moving.cinema && (s.slotOrder || 1) === (moving.slotOrder || 1)
-  );
+  const sibsOnTarget = tgtList.filter(s => s.cinema === moving.cinema);
+  const slotTaken = sibsOnTarget.some(s => (s.slotOrder || 1) === (moving.slotOrder || 1));
   if (slotTaken) {
-    const sibs = tgtList.filter(s => s.cinema === moving.cinema);
-    moving.slotOrder = sibs.length > 0 ? Math.max(...sibs.map(s => s.slotOrder || 1)) + 1 : 1;
+    moving.slotOrder = Math.max(...sibsOnTarget.map(s => s.slotOrder || 1)) + 1;
   }
   tgtList.push(moving);
 
-  // Commit
   if (srcList.length > 0) {
     calendarData[srcDate] = srcList;
   } else {
@@ -1026,7 +1019,6 @@ function onCellDrop(e) {
   save();
   renderAll();
 
-  // Flash the target cell green
   setTimeout(() => {
     document.querySelectorAll('.cal-cell').forEach(cell => {
       if (cell.dataset.date === targetDate) {
@@ -1036,6 +1028,7 @@ function onCellDrop(e) {
     });
   }, 50);
 }
+
 
 // ─── Calendar render ─────────────────────────
 function renderCalendar() {
@@ -1100,8 +1093,10 @@ function renderCalendar() {
       chip.draggable = true;
       chip.dataset.srcDate = ds;
       chip.dataset.srcIdx  = sIdx;
+      // Store the full screening object so drop can match by identity, not fragile index
+      chip.dataset.srcData = JSON.stringify(s);
       chip.addEventListener('dragstart', onChipDragStart);
-      chip.addEventListener('click', e => e.stopPropagation()); // chip click doesn't open modal
+      chip.addEventListener('click', e => e.stopPropagation());
       chipsWrap.appendChild(chip);
     });
 
