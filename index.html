@@ -1140,75 +1140,50 @@ function renderScreeningsTable() {
     .sort((a,b) => a[0].localeCompare(b[0]));
 
   if (entries.length === 0) {
-    thead.innerHTML = '<tr><th>Date</th><th>Day</th><th>Cinema</th></tr>';
-    tbody.innerHTML = '<tr><td colspan="3" class="empty-msg">No screenings yet — click a day to add.</td></tr>';
+    thead.innerHTML = '<tr><th>Date</th><th>Day</th><th>Program Title (Cinema 1) (Early Show)</th><th>Program Title (Cinema 1) (Late Show)</th><th>Program Title (Cinema 2) (Early Show)</th><th>Program Title (Cinema 2) (Late Show)</th><th>Program Title (Midnight)</th><th>Program Title (Rivoli / Rivoli Revival)</th></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">No screenings yet — click a day to add.</td></tr>';
     return;
   }
 
-  // Build all date+cinema groups so we can find the max slot count for header
-  const groups = []; // { ds, dow, cinema, slots[] }
-  entries.forEach(([ds, scrns]) => {
-    const date = new Date(ds + 'T00:00:00');
-    const dow  = DAYS[date.getDay()];
-    const sorted = [...scrns].sort((a,b) => {
-      if (a.cinema < b.cinema) return -1;
-      if (a.cinema > b.cinema) return 1;
-      return (a.slotOrder||1) - (b.slotOrder||1);
-    });
-    // Group by cinema within this date
-    const cinemaMap = {};
-    sorted.forEach(s => {
-      if (!cinemaMap[s.cinema]) cinemaMap[s.cinema] = [];
-      cinemaMap[s.cinema].push(s);
-    });
-    const cinemaOrder = ['C1','C2','Rivoli','Other'];
-    const cinemasHere = cinemaOrder.filter(c => cinemaMap[c]);
-    Object.keys(cinemaMap).filter(c => !cinemaOrder.includes(c)).forEach(c => cinemasHere.push(c));
-    cinemasHere.forEach(cinema => {
-      groups.push({ ds, dow, cinema, slots: cinemaMap[cinema] });
-    });
-  });
+  // Fixed column definitions — each maps to a function that finds the matching screening
+  const COLS = [
+    { label: 'Program Title (Cinema 1) (Early Show)',     match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
+    { label: 'Program Title (Cinema 1) (Late Show)',      match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
+    { label: 'Program Title (Cinema 2) (Early Show)',     match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
+    { label: 'Program Title (Cinema 2) (Late Show)',      match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
+    { label: 'Program Title (Midnight)',                  match: s => s.type === 'midnight' },
+    { label: 'Program Title (Rivoli / Rivoli Revival)',   match: s => s.cinema === 'Rivoli' || s.cinema === 'RivoliRevival' },
+  ];
 
-  // Max slots across all groups → determines how many slot columns to render
-  const maxSlots = Math.max(...groups.map(g => g.slots.length));
-
-  // Build header: Date, Day, Cinema, then Slot 1 cols, Slot 2 cols, …
-  let hdrHTML = '<tr><th>Date</th><th>Day</th><th>Cinema</th>';
-  for (let i = 1; i <= maxSlots; i++) {
-    hdrHTML += '<th>Slot ' + i + ' — Program Title</th>'
-      + '<th>Slot ' + i + ' — Films</th>'
-      + '<th>Slot ' + i + ' — Type</th>'
-      + '<th>Slot ' + i + ' — Show</th>'
-      + '<th>Slot ' + i + ' — After Hours</th>';
-  }
+  // Fixed header
+  let hdrHTML = '<tr><th>Date</th><th>Day</th>';
+  COLS.forEach(col => { hdrHTML += '<th>' + col.label + '</th>'; });
   hdrHTML += '</tr>';
   thead.innerHTML = hdrHTML;
 
-  // Build rows
-  groups.forEach(({ ds, dow, cinema, slots }) => {
-    const row = document.createElement('tr');
+  // One row per date
+  entries.forEach(([ds, scrns]) => {
+    const date = new Date(ds + 'T00:00:00');
+    const dow  = DAYS[date.getDay()];
+    const row  = document.createElement('tr');
     row.className = 'clickable';
     row.onclick = () => openModal(ds);
 
-    let html = '<td>' + ds + '</td><td>' + dow + '</td><td>' + cinemaPrettyName(cinema) + '</td>';
+    let html = '<td>' + ds + '</td><td>' + dow + '</td>';
 
-    for (let i = 0; i < maxSlots; i++) {
-      const s = slots[i];
-      if (!s) {
-        html += '<td></td><td></td><td></td><td></td><td></td>';
-        continue;
+    COLS.forEach(col => {
+      const match = scrns.find(col.match);
+      if (!match) {
+        html += '<td></td>';
+      } else {
+        const pt = match.isCompilation
+          ? (match.compilationTitle || match.films.map(f => f.title).join(' / '))
+          : (match.films[0]?.title || '');
+        const pill = match.type !== 'regular' ? ' <span class="type-pill ' + match.type + '">' + TYPE_LABELS[match.type] + '</span>' : '';
+        const afterTag = match.afterHours ? ' <span class="conflict-pill">After Hours</span>' : '';
+        html += '<td>' + (pt ? (match.isCompilation ? '<em>' + pt + '</em>' : pt) : '') + pill + afterTag + '</td>';
       }
-      const pt = programTitle(s);
-      const filmStr = s.isCompilation
-        ? s.films.map(f => f.title + (f.year ? ' (' + f.year + ')' : '')).join(' / ')
-        : (s.films[0]?.title || '');
-      const compTag = s.isCompilation ? ' <span class="yes-pill">Comp.</span>' : '';
-      html += '<td>' + (pt ? '<em>' + pt + '</em>' : '') + compTag + '</td>'
-        + '<td>' + filmStr + '</td>'
-        + '<td><span class="type-pill ' + s.type + '">' + TYPE_LABELS[s.type] + '</span></td>'
-        + '<td>' + slotLabel(s) + '</td>'
-        + '<td>' + (s.afterHours ? '<span class="conflict-pill">After Hours</span>' : '') + '</td>';
-    }
+    });
 
     row.innerHTML = html;
     tbody.appendChild(row);
@@ -1219,38 +1194,52 @@ function renderFilmsTable() {
   const thead = document.getElementById('filmsThead');
   const tbody = document.getElementById('filmsTbody');
 
-  const filmMap = {}; // key: "title|||year" -> [dateStr,...]
+  const filmMap = {}; // key -> { title, year, isCompilation, dates[] }
 
   Object.entries(calendarData)
     .filter(([,v]) => v.length > 0)
     .sort((a,b) => a[0].localeCompare(b[0]))
     .forEach(([ds, scrns]) => {
       scrns.forEach(s => {
-        s.films.forEach(f => {
-          const k = `${f.title}|||${f.year||''}`;
-          if (!filmMap[k]) filmMap[k] = { title: f.title, year: f.year||'', dates: [] };
+        if (s.isCompilation) {
+          // Use the block/program title as the entry; fall back to joined film titles
+          const blockTitle = s.compilationTitle
+            || s.films.map(f => f.title).filter(Boolean).join(' / ')
+            || '(untitled compilation)';
+          const k = 'COMP|||' + blockTitle;
+          if (!filmMap[k]) filmMap[k] = { title: blockTitle, year: '', isCompilation: true, dates: [] };
           if (!filmMap[k].dates.includes(ds)) filmMap[k].dates.push(ds);
-        });
+        } else {
+          s.films.forEach(f => {
+            if (!f.title) return;
+            const k = f.title + '|||' + (f.year||'');
+            if (!filmMap[k]) filmMap[k] = { title: f.title, year: f.year||'', isCompilation: false, dates: [] };
+            if (!filmMap[k].dates.includes(ds)) filmMap[k].dates.push(ds);
+          });
+        }
       });
     });
 
   const sorted = Object.values(filmMap).sort((a,b) => a.title.localeCompare(b.title));
   if (sorted.length === 0) {
-    thead.innerHTML = '<tr><th>Film</th><th>Year</th></tr>';
-    tbody.innerHTML = `<tr><td colspan="2" class="empty-msg">No films yet.</td></tr>`;
+    thead.innerHTML = '<tr><th>Film / Program</th><th>Year</th></tr>';
+    tbody.innerHTML = '<tr><td colspan="2" class="empty-msg">No films yet.</td></tr>';
     return;
   }
 
   const maxDates = Math.max(...sorted.map(f => f.dates.length));
-  let hdr = '<tr><th>Film</th><th>Year</th>';
-  for (let i=1; i<=maxDates; i++) hdr += `<th>Date ${i}</th>`;
+  let hdr = '<tr><th>Film / Program</th><th>Year</th>';
+  for (let i = 1; i <= maxDates; i++) hdr += '<th>Date ' + i + '</th>';
   hdr += '</tr>';
   thead.innerHTML = hdr;
 
   tbody.innerHTML = '';
   sorted.forEach(f => {
-    let row = `<tr><td><strong>${f.title}</strong></td><td>${f.year}</td>`;
-    for (let i=0; i<maxDates; i++) row += `<td>${f.dates[i]||''}</td>`;
+    const titleCell = f.isCompilation
+      ? '<em>' + f.title + '</em> <span class="yes-pill">Compilation</span>'
+      : '<strong>' + f.title + '</strong>';
+    let row = '<tr><td>' + titleCell + '</td><td>' + f.year + '</td>';
+    for (let i = 0; i < maxDates; i++) row += '<td>' + (f.dates[i]||'') + '</td>';
     row += '</tr>';
     tbody.innerHTML += row;
   });
