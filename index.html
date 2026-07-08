@@ -1846,16 +1846,37 @@ function flatRows() {
 }
 
 function exportScreeningsCSV() {
-  const rows = flatRows();
-  if (!rows.length) { alert('No data to export'); return; }
-  let csv = 'Date,Day,Cinema,Show Slot,After Hours,Slot Start,Slot End,Duration (mins),Type,Is Compilation,Program Title,Film Title,Year,Film Order\n';
-  rows.forEach(r => {
-    csv += [r.date, r.day, r.cinema, r.show_slot, r.after_hours,
-      r.slot_start, r.slot_end, r.slot_duration, r.type, r.is_compilation,
-      '"' + (r.compilation_title||'').replace(/"/g,'""') + '"',
-      '"' + r.film_title.replace(/"/g,'""') + '"',
-      r.film_year, r.film_order].join(',') + '\n';
+  const entries = Object.entries(calendarData)
+    .filter(([,v]) => v.length > 0)
+    .sort((a,b) => a[0].localeCompare(b[0]));
+  if (!entries.length) { alert('No data to export'); return; }
+
+  const COLS = [
+    { label: 'Program Title (Cinema 1) (Early Show)',   match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
+    { label: 'Program Title (Cinema 1) (Late Show)',    match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
+    { label: 'Program Title (Cinema 2) (Early Show)',   match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
+    { label: 'Program Title (Cinema 2) (Late Show)',    match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
+    { label: 'Program Title (Midnight)',                match: s => s.type === 'midnight' },
+    { label: 'Program Title (Rivoli / Rivoli Revival)', match: s => s.cinema === 'Rivoli' || s.cinema === 'RivoliRevival' },
+  ];
+
+  const q = v => '"' + String(v||'').replace(/"/g,'""') + '"';
+
+  let csv = ['Date', 'Day', ...COLS.map(c => c.label)].join(',') + '\n';
+
+  entries.forEach(([ds, scrns]) => {
+    const dow = DAYS[new Date(ds + 'T00:00:00').getDay()];
+    const cells = COLS.map(col => {
+      const s = scrns.find(col.match);
+      if (!s) return '""';
+      const title = s.isCompilation
+        ? (s.compilationTitle || s.films.map(f => f.title).join(' / '))
+        : (s.films[0]?.title || '');
+      return q(title);
+    });
+    csv += [q(ds), q(dow), ...cells].join(',') + '\n';
   });
+
   dl(csv, 'screenings.csv', 'text/csv');
 }
 
