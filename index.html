@@ -981,44 +981,60 @@ function dbRows() {
     .filter(([,v]) => v.length > 0)
     .sort((a,b) => a[0].localeCompare(b[0]))
     .forEach(([ds, scrns]) => {
-      // Sort by cinema then slotOrder for consistent Event ID assignment
-      const sorted = [...scrns].sort((a,b) => {
-        if (a.cinema < b.cinema) return -1;
-        if (a.cinema > b.cinema) return 1;
-        return (a.slotOrder||1) - (b.slotOrder||1);
-      });
+      // Group screenings on this date by their program title.
+      // Same program playing Early + Late (or across cinemas) = one Event ID.
+      const programMap = {}; // programKey -> { screenings[], programTitle, type }
 
-      sorted.forEach(s => {
-        const evId = 'SCR-' + String(eventId).padStart(3, '0');
+      scrns.forEach(s => {
         const programT = s.isCompilation
           ? (s.compilationTitle || s.films.map(f => f.title).join(' / '))
           : (s.films[0]?.title || '');
-        const location = cinemaPrettyName(s.cinema);
-        const type     = TYPE_LABELS[s.type] || s.type;
+        // Key: program title + type (a rental called "Flow" ≠ the film "Flow")
+        const key = programT + '|||' + s.type;
+        if (!programMap[key]) {
+          programMap[key] = { programTitle: programT, type: s.type, screenings: [], films: s.films, isCompilation: s.isCompilation };
+        }
+        programMap[key].screenings.push(s);
+      });
 
-        if (s.isCompilation) {
-          s.films.forEach((f, fi) => {
+      // Sort programs by first cinema then slotOrder for stable Event ID ordering
+      const programs = Object.values(programMap).sort((a, b) => {
+        const aFirst = a.screenings[0];
+        const bFirst = b.screenings[0];
+        if (aFirst.cinema < bFirst.cinema) return -1;
+        if (aFirst.cinema > bFirst.cinema) return 1;
+        return (aFirst.slotOrder||1) - (bFirst.slotOrder||1);
+      });
+
+      programs.forEach(prog => {
+        const evId    = 'SCR-' + String(eventId).padStart(3, '0');
+        const type    = TYPE_LABELS[prog.type] || prog.type;
+        // Collect all locations this program plays on this date
+        const locations = [...new Set(prog.screenings.map(s => cinemaPrettyName(s.cinema)))].join(', ');
+
+        if (prog.isCompilation) {
+          prog.films.forEach((f, fi) => {
             rows.push({
               event_id:       evId,
               screening_id:   fi + 1,
-              program_title:  programT,
+              program_title:  prog.programTitle,
               film_title:     f.title || '',
               year:           f.year  || '',
               date:           ds,
-              location,
+              location:       locations,
               screening_type: type
             });
           });
         } else {
-          const f = s.films[0] || {};
+          const f = prog.screenings[0].films[0] || {};
           rows.push({
             event_id:       evId,
             screening_id:   1,
-            program_title:  programT,
+            program_title:  prog.programTitle,
             film_title:     f.title || '',
             year:           f.year  || '',
             date:           ds,
-            location,
+            location:       locations,
             screening_type: type
           });
         }
