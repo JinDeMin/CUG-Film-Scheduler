@@ -632,13 +632,17 @@
     <div class="card">
       <div class="card-header">Master Tracker</div>
       <div class="card-body">
-        <div class="export-bar">
+        <div class="export-bar" style="align-items:center;">
           <button class="btn btn-neutral btn-sm" onclick="exportDbCSV()">Export CSV</button>
           <button class="btn btn-neutral btn-sm" onclick="exportDbJSON()">Export JSON</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted);margin-left:8px;cursor:pointer;">
+            <input type="checkbox" id="dbCondensed" onchange="renderDbTable()" style="width:auto;accent-color:var(--accent2);">
+            Condense compilations to one row
+          </label>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr>
+            <thead id="dbThead"><tr>
               <th>Event ID</th>
               <th>Screening ID</th>
               <th>Program Title</th>
@@ -1045,8 +1049,11 @@ function dbRows() {
 }
 
 function renderDbTable() {
-  const tbody = document.getElementById('dbTbody');
+  const tbody  = document.getElementById('dbTbody');
+  const thead  = document.getElementById('dbThead');
   if (!tbody) return;
+
+  const condensed = document.getElementById('dbCondensed')?.checked || false;
   const rows = dbRows();
 
   if (!rows.length) {
@@ -1054,34 +1061,110 @@ function renderDbTable() {
     return;
   }
 
-  let lastEventId = null;
-  tbody.innerHTML = rows.map(r => {
-    const isFirstRow = r.event_id !== lastEventId;
-    lastEventId = r.event_id;
-    const borderTop = isFirstRow && r.screening_id === 1 ? 'border-top:2px solid var(--border);' : '';
-    return '<tr style="' + borderTop + '">'
-      + '<td style="font-weight:700;color:var(--accent2)">' + r.event_id + '</td>'
-      + '<td style="text-align:center;color:var(--muted)">' + r.screening_id + '</td>'
-      + '<td><em>' + r.program_title + '</em></td>'
-      + '<td>' + r.film_title + '</td>'
-      + '<td>' + r.year + '</td>'
-      + '<td>' + r.date + '</td>'
-      + '<td>' + r.location + '</td>'
-      + '<td><span class="type-pill ' + Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === r.screening_type) + '">' + r.screening_type + '</span></td>'
+  if (condensed) {
+    // Collapse all screening_id > 1 rows into the first row of each event,
+    // joining film titles with " // " and years with " // "
+    const eventMap = {};
+    rows.forEach(r => {
+      if (!eventMap[r.event_id]) {
+        eventMap[r.event_id] = { ...r, film_titles: [r.film_title], years: [r.year] };
+      } else {
+        if (r.film_title) eventMap[r.event_id].film_titles.push(r.film_title);
+        if (r.year)       eventMap[r.event_id].years.push(r.year);
+      }
+    });
+
+    // Update header — no Screening ID column in condensed mode
+    thead.innerHTML = '<tr>'
+      + '<th>Event ID</th>'
+      + '<th>Program Title</th>'
+      + '<th>Film Title(s)</th>'
+      + '<th>Year(s)</th>'
+      + '<th>Date</th>'
+      + '<th>Location</th>'
+      + '<th>Screening Type</th>'
       + '</tr>';
-  }).join('');
+
+    const typeKey = v => Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === v) || '';
+    tbody.innerHTML = Object.values(eventMap).map(r => {
+      const filmTitles = r.film_titles.filter(Boolean).join(' // ');
+      const years      = [...new Set(r.years.filter(Boolean))].join(' // ');
+      return '<tr>'
+        + '<td style="font-weight:700;color:var(--accent2)">' + r.event_id + '</td>'
+        + '<td><em>' + r.program_title + '</em></td>'
+        + '<td>' + filmTitles + '</td>'
+        + '<td>' + years + '</td>'
+        + '<td>' + r.date + '</td>'
+        + '<td>' + r.location + '</td>'
+        + '<td><span class="type-pill ' + typeKey(r.screening_type) + '">' + r.screening_type + '</span></td>'
+        + '</tr>';
+    }).join('');
+
+  } else {
+    // Expanded view — restore full header with Screening ID
+    thead.innerHTML = '<tr>'
+      + '<th>Event ID</th>'
+      + '<th>Screening ID</th>'
+      + '<th>Program Title</th>'
+      + '<th>Film Title</th>'
+      + '<th>Year</th>'
+      + '<th>Date</th>'
+      + '<th>Location</th>'
+      + '<th>Screening Type</th>'
+      + '</tr>';
+
+    let lastEventId = null;
+    const typeKey = v => Object.keys(TYPE_LABELS).find(k => TYPE_LABELS[k] === v) || '';
+    tbody.innerHTML = rows.map(r => {
+      const isFirstRow = r.event_id !== lastEventId;
+      lastEventId = r.event_id;
+      const borderTop = isFirstRow ? 'border-top:2px solid var(--border);' : '';
+      return '<tr style="' + borderTop + '">'
+        + '<td style="font-weight:700;color:var(--accent2)">' + r.event_id + '</td>'
+        + '<td style="text-align:center;color:var(--muted)">' + r.screening_id + '</td>'
+        + '<td><em>' + r.program_title + '</em></td>'
+        + '<td>' + r.film_title + '</td>'
+        + '<td>' + r.year + '</td>'
+        + '<td>' + r.date + '</td>'
+        + '<td>' + r.location + '</td>'
+        + '<td><span class="type-pill ' + typeKey(r.screening_type) + '">' + r.screening_type + '</span></td>'
+        + '</tr>';
+    }).join('');
+  }
 }
 
 function exportDbCSV() {
   const rows = dbRows();
   if (!rows.length) { alert('No data to export'); return; }
   const q = v => '"' + String(v||'').replace(/"/g, '""') + '"';
-  let csv = 'Event ID,Screening ID,Program Title,Film Title,Year,Date,Location,Screening Type\n';
-  rows.forEach(r => {
-    csv += [r.event_id, r.screening_id, q(r.program_title), q(r.film_title),
-            r.year, r.date, q(r.location), q(r.screening_type)].join(',') + '\n';
-  });
-  dl(csv, 'master-tracker.csv', 'text/csv');
+  const condensed = document.getElementById('dbCondensed')?.checked || false;
+
+  if (condensed) {
+    const eventMap = {};
+    rows.forEach(r => {
+      if (!eventMap[r.event_id]) {
+        eventMap[r.event_id] = { ...r, film_titles: [r.film_title], years: [r.year] };
+      } else {
+        if (r.film_title) eventMap[r.event_id].film_titles.push(r.film_title);
+        if (r.year)       eventMap[r.event_id].years.push(r.year);
+      }
+    });
+    let csv = 'Event ID,Program Title,Film Title(s),Year(s),Date,Location,Screening Type\n';
+    Object.values(eventMap).forEach(r => {
+      const filmTitles = r.film_titles.filter(Boolean).join(' // ');
+      const years      = [...new Set(r.years.filter(Boolean))].join(' // ');
+      csv += [r.event_id, q(r.program_title), q(filmTitles), q(years),
+              r.date, q(r.location), q(r.screening_type)].join(',') + '\n';
+    });
+    dl(csv, 'master-tracker-condensed.csv', 'text/csv');
+  } else {
+    let csv = 'Event ID,Screening ID,Program Title,Film Title,Year,Date,Location,Screening Type\n';
+    rows.forEach(r => {
+      csv += [r.event_id, r.screening_id, q(r.program_title), q(r.film_title),
+              r.year, r.date, q(r.location), q(r.screening_type)].join(',') + '\n';
+    });
+    dl(csv, 'master-tracker.csv', 'text/csv');
+  }
 }
 
 function exportDbJSON() {
