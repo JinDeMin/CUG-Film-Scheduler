@@ -156,6 +156,7 @@
       flex-direction: column;
       transition: border-color .15s, box-shadow .15s;
       position: relative;
+      height: auto;
     }
     .cal-cell:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
     .cal-cell.empty { background: var(--surface2); cursor: default; border-color: transparent; }
@@ -171,8 +172,6 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
-      overflow: hidden;
-      flex: 1;
     }
     .chip {
       font-size: 9px;
@@ -1310,7 +1309,7 @@ function renderCalendar() {
     const chipsWrap = document.createElement('div');
     chipsWrap.className = 'cal-chips';
 
-    scrns.slice(0, 5).forEach((s, sIdx) => {
+    scrns.forEach((s, sIdx) => {
       const displayTitle = s.isCompilation && s.compilationTitle
         ? s.compilationTitle
         : (s.films[0]?.title || '(untitled)');
@@ -1329,13 +1328,6 @@ function renderCalendar() {
       chip.addEventListener('click', e => e.stopPropagation());
       chipsWrap.appendChild(chip);
     });
-
-    if (scrns.length > 5) {
-      const more = document.createElement('div');
-      more.className = 'chip other';
-      more.textContent = '+' + (scrns.length - 5) + ' more';
-      chipsWrap.appendChild(more);
-    }
 
     cell.appendChild(chipsWrap);
 
