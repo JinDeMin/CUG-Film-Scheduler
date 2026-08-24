@@ -899,6 +899,35 @@ function titleFieldLabel(type) {
   return 'Film Title';
 }
 
+// A screening only ever sits in slot 1 (Early) or slot 2 (Late). Older records
+// could hold overflow values (3, 4, …) from earlier versions, which made an entry
+// display as "Late Show" while the Show Slot dropdown fell back to "Early Show" —
+// picking Early then fired no change event and the entry appeared stuck.
+// Everything reads the slot through this function so 1 and 2 are the only states.
+function slotIndex(s) {
+  return (s.slotOrder || 1) === 1 ? 1 : 2;
+}
+
+function usesEarlyLate(s) {
+  return MULTI_SLOT_TYPES.has(s.type)
+    && s.type !== 'rivolirevival'
+    && s.type !== 'midnight'
+    && !s.afterHours;
+}
+
+// Collapse any legacy overflow slot values down to 1 or 2
+function normalizeSlotOrder(s) {
+  if (!s) return s;
+  if (s.type === 'midnight' || s.afterHours) { s.slotOrder = s.slotOrder || 1; return s; }
+  s.slotOrder = usesEarlyLate(s) ? slotIndex(s) : (s.slotOrder || 1);
+  return s;
+}
+
+function normalizeAllSlots(data) {
+  Object.values(data || {}).forEach(list => (list || []).forEach(normalizeSlotOrder));
+  return data;
+}
+
 function fmtTime12(t) {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
@@ -916,7 +945,7 @@ function slotLabel(s) {
     if (s.slotStart)                   return fmtTime12(s.slotStart);
     return 'After Hours';
   }
-  return (s.slotOrder || 1) === 1 ? 'Early Show' : 'Late Show';
+  return slotIndex(s) === 1 ? 'Early Show' : 'Late Show';
 }
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -965,7 +994,7 @@ function effectiveSlot(s) {
   if (s.afterHours) return null; // handled separately via time-window check
   if (EXCLUSIVE_TYPES.has(s.type)) return 'exclusive';
   if (!MULTI_SLOT_TYPES.has(s.type)) return 'single';
-  return (s.slotOrder || 1) === 1 ? 'early' : 'late';
+  return slotIndex(s) === 1 ? 'early' : 'late';
 }
 
 // Returns array of conflict descriptor objects: { room, reason }
@@ -1075,14 +1104,22 @@ function conflictMessage(screenings) {
 function assignFreeSlot(s, list) {
   if (s.type === 'midnight' || s.afterHours) return s;
   const sibs = list.filter(x => x !== s && x.cinema === s.cinema && x.type !== 'midnight' && !x.afterHours);
-  if (!sibs.length) return s;
+  if (!sibs.length) return normalizeSlotOrder(s);
+
+  if (usesEarlyLate(s)) {
+    // Early/Late screenings only ever hold slot 1 or 2. Keep the requested slot when
+    // it's free, take the other one when it isn't, and if both are occupied keep the
+    // requested slot so the day shows a real conflict instead of a hidden third slot.
+    const taken = n => sibs.some(x => usesEarlyLate(x) && slotIndex(x) === n);
+    const want  = slotIndex(s);
+    const alt   = want === 1 ? 2 : 1;
+    s.slotOrder = !taken(want) ? want : (!taken(alt) ? alt : want);
+    return s;
+  }
+
   const taken = n => sibs.some(x => (x.slotOrder || 1) === n);
   const mine  = s.slotOrder || 1;
   if (!taken(mine)) return s;
-  if (MULTI_SLOT_TYPES.has(s.type)) {
-    const alt = mine === 1 ? 2 : 1;
-    if (!taken(alt)) { s.slotOrder = alt; return s; }
-  }
   s.slotOrder = Math.max(...sibs.map(x => x.slotOrder || 1)) + 1;
   return s;
 }
@@ -1571,10 +1608,10 @@ function renderScreeningsTable() {
 
   // Fixed column definitions — each maps to a function that finds the matching screening
   const COLS = [
-    { label: 'Program Title (Cinema 1) (Early Show)',     match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
-    { label: 'Program Title (Cinema 1) (Late Show)',      match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
-    { label: 'Program Title (Cinema 2) (Early Show)',     match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
-    { label: 'Program Title (Cinema 2) (Late Show)',      match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
+    { label: 'Program Title (Cinema 1) (Early Show)',     match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
+    { label: 'Program Title (Cinema 1) (Late Show)',      match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
+    { label: 'Program Title (Cinema 2) (Early Show)',     match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
+    { label: 'Program Title (Cinema 2) (Late Show)',      match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
     { label: 'Program Title (Midnight)',                  match: s => s.type === 'midnight' },
     { label: 'Program Title (Rivoli / Rivoli Revival)',   match: s => s.cinema === 'Rivoli' || s.cinema === 'RivoliRevival' },
   ];
@@ -1775,8 +1812,8 @@ function renderModalScreenings() {
               <label class="field-label">Show Slot</label>
               ${MULTI_SLOT_TYPES.has(s.type) && s.type !== 'rivolirevival' ? `
               <select id="showslot-${idx}" onchange="updateSlotOrder(${idx}, this.value)">
-                <option value="1" ${(s.slotOrder||1)===1?'selected':''}>Early Show</option>
-                <option value="2" ${(s.slotOrder||1)===2?'selected':''}>Late Show</option>
+                <option value="1" ${slotIndex(s)===1?'selected':''}>Early Show</option>
+                <option value="2" ${slotIndex(s)===2?'selected':''}>Late Show</option>
               </select>` : `
               <div style="padding:7px 9px;font-size:13px;color:var(--muted);border:1px solid var(--border);border-radius:3px;background:var(--surface2)">
                 ${s.type === 'midnight' ? 'After Hours' : 'Single'}
@@ -1952,8 +1989,25 @@ function changeType(idx, val) {
 }
 
 function updateSlotOrder(idx, val) {
-  editingScreenings[idx].slotOrder = parseInt(val);
-  updateConflictSummary();
+  const s    = editingScreenings[idx];
+  const want = parseInt(val) === 2 ? 2 : 1;
+  const had  = slotIndex(s);
+
+  // If another screening in the same cinema already holds that slot, trade places
+  // with it rather than stacking two into one slot.
+  const occupant = editingScreenings.find((x, i) =>
+    i !== idx && x.cinema === s.cinema && usesEarlyLate(x) && slotIndex(x) === want
+  );
+
+  s.slotOrder = want;
+  if (occupant) occupant.slotOrder = had;
+
+  // Re-render so the block header, the cinema grouping and the conflict banner
+  // all reflect the new slot immediately.
+  renderModalScreenings();
+  setTimeout(() => {
+    document.getElementById('scr-block-' + idx)?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }, 30);
 }
 
 function toggleAfterHoursSlot(idx, isAfterHours) {
@@ -2293,10 +2347,10 @@ function exportScreeningsCSV() {
   if (!entries.length) { alert('No data to export'); return; }
 
   const COLS = [
-    { label: 'Program Title (Cinema 1) (Early Show)',   match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
-    { label: 'Program Title (Cinema 1) (Late Show)',    match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
-    { label: 'Program Title (Cinema 2) (Early Show)',   match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 1 },
-    { label: 'Program Title (Cinema 2) (Late Show)',    match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && (s.slotOrder||1) === 2 },
+    { label: 'Program Title (Cinema 1) (Early Show)',   match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
+    { label: 'Program Title (Cinema 1) (Late Show)',    match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
+    { label: 'Program Title (Cinema 2) (Early Show)',   match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
+    { label: 'Program Title (Cinema 2) (Late Show)',    match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
     { label: 'Program Title (Midnight)',                match: s => s.type === 'midnight' },
     { label: 'Program Title (Rivoli / Rivoli Revival)', match: s => s.cinema === 'Rivoli' || s.cinema === 'RivoliRevival' },
   ];
@@ -2416,7 +2470,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Live listener — fires immediately on connect and on every remote save
   window.CAL_REF.on('value', snapshot => {
-    calendarData = snapshot.val() || {};
+    // Repair any legacy overflow slot values before anything renders
+    calendarData = normalizeAllSlots(snapshot.val() || {});
     const l = document.getElementById('cal-loader');
     if (l) l.remove();
     renderAll();
