@@ -20,6 +20,8 @@
       --rivoli:    #7b5ea7;
       --rivolirevival: #b5427a;
       --rental:    #1a6b3c;
+      --festival:  #0f8b8d;       /* film festival — teal */
+      --trivia:    #d17b0f;       /* trivia night — amber */
       --other:     #8a6020;
       --regular:   #1a4580;
       --conflict:  #e74c3c;
@@ -162,6 +164,17 @@
     .cal-cell.empty { background: var(--surface2); cursor: default; border-color: transparent; }
     .cal-cell.empty:hover { border-color: transparent; box-shadow: none; }
 
+    /* Paste-on-click mode */
+    body.paste-mode .cal-cell:not(.empty) {
+      cursor: copy;
+      border-style: dashed;
+      border-color: var(--ok);
+    }
+    body.paste-mode .cal-cell:not(.empty):hover {
+      box-shadow: 0 0 0 2px var(--ok);
+      background: #f1faf3;
+    }
+
     .cal-day-num {
       font-size: 12px;
       font-weight: 700;
@@ -188,6 +201,8 @@
     .chip.rivoli        { background: var(--rivoli); }
     .chip.rivolirevival { background: var(--rivolirevival); }
     .chip.rental     { background: var(--rental); }
+    .chip.festival   { background: var(--festival); }
+    .chip.trivia     { background: var(--trivia); }
     .chip.other      { background: var(--other); }
     .chip.conflict-chip { background: var(--conflict); }
 
@@ -218,6 +233,42 @@
       border-radius: 50%;
       background: var(--ok);
     }
+
+    /* ── Clipboard bar ── */
+    .clip-bar {
+      display: none;
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      z-index: 900;
+      background: var(--accent2);
+      color: #fff;
+      border-radius: 6px;
+      box-shadow: 0 6px 22px rgba(0,0,0,.28);
+      padding: 9px 12px;
+      align-items: center;
+      gap: 10px;
+      max-width: 94vw;
+    }
+    .clip-bar.show { display: flex; }
+    .clip-bar .clip-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      opacity: .65;
+    }
+    .clip-bar .clip-title {
+      font-size: 13px;
+      font-weight: 700;
+      max-width: 46vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .clip-bar .btn { white-space: nowrap; }
+    .btn-ok { background: var(--ok); color: #fff; }
 
     /* ── Modal ── */
     .modal-overlay {
@@ -292,6 +343,7 @@
       padding: 7px 10px;
       background: var(--surface2);
       border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
     }
     .screening-block-head .scr-num {
       font-size: 11px;
@@ -301,13 +353,12 @@
       min-width: 80px;
     }
     .screening-block-head .remove-btn {
-      margin-left: auto;
       background: none;
       border: none;
       color: var(--muted);
       cursor: pointer;
       font-size: 14px;
-      padding: 0;
+      padding: 0 2px;
     }
     .screening-block-head .remove-btn:hover { color: var(--conflict); }
 
@@ -339,7 +390,7 @@
       display: block;
       margin-bottom: 3px;
     }
-    input[type=text], input[type=number], select {
+    input[type=text], input[type=number], input[type=time], input[type=date], select {
       width: 100%;
       padding: 7px 9px;
       border: 1px solid var(--border);
@@ -361,7 +412,11 @@
     .type-select.t-rivoli        { color: var(--rivoli); }
     .type-select.t-rivolirevival { color: var(--rivolirevival); }
     .type-select.t-rental    { color: var(--rental); }
+    .type-select.t-festival  { color: var(--festival); }
+    .type-select.t-trivia    { color: var(--trivia); }
     .type-select.t-other     { color: var(--other); }
+
+    .cinema-select { font-weight: 700; color: var(--accent2); }
 
     /* in-window toggle */
     .window-row {
@@ -410,9 +465,11 @@
       display: flex;
       gap: 8px;
       margin-top: 10px;
+      flex-wrap: wrap;
     }
     .add-screening-area select {
       flex: 1;
+      min-width: 130px;
       font-size: 13px;
     }
 
@@ -428,6 +485,7 @@
       transition: opacity .15s;
     }
     .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: default; }
     .btn-primary  { background: var(--accent2); color: #fff; }
     .btn-danger   { background: var(--conflict); color: #fff; }
     .btn-neutral  { background: #eceff1; color: var(--text); }
@@ -477,6 +535,8 @@
     .type-pill.rivoli        { background: var(--rivoli); }
     .type-pill.rivolirevival { background: var(--rivolirevival); }
     .type-pill.rental    { background: var(--rental); }
+    .type-pill.festival  { background: var(--festival); }
+    .type-pill.trivia    { background: var(--trivia); }
     .type-pill.other     { background: var(--other); }
 
     .yes-pill { background: #e8f5e9; color: #1b5e20; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
@@ -589,6 +649,8 @@
           <div class="legend-item"><div class="legend-dot" style="background:var(--rivoli)"></div> Rivoli</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--rivolirevival)"></div> Rivoli Revival</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--rental)"></div> Rental/Event</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--festival)"></div> Film Festival</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--trivia)"></div> Trivia Night</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--other)"></div> Other</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--conflict)"></div> Conflict</div>
         </div>
@@ -677,6 +739,14 @@
   </div>
 </div>
 
+<!-- ═══════════════ CLIPBOARD BAR ═══════════════ -->
+<div class="clip-bar" id="clipBar">
+  <span class="clip-label">Copied</span>
+  <span class="clip-title" id="clipTitle"></span>
+  <button class="btn btn-ok btn-sm" id="pasteModeBtn" onclick="togglePasteMode()">Paste on click: off</button>
+  <button class="btn btn-neutral btn-sm" onclick="clearClipboard()">Clear</button>
+</div>
+
 <!-- ═══════════════ EDIT MODAL ═══════════════ -->
 <div class="modal-overlay" id="editModal">
   <div class="modal-box">
@@ -694,6 +764,8 @@
           <option value="rivoli">Rivoli</option>
           <option value="rivolirevival">Rivoli Revival</option>
           <option value="rental">Rental/Event</option>
+          <option value="festival">Film Festival</option>
+          <option value="trivia">Trivia Night</option>
           <option value="other">Other</option>
         </select>
         <select id="newScreeningCinema">
@@ -704,6 +776,7 @@
           <option value="Other">Other Screen</option>
         </select>
         <button class="btn btn-neutral btn-sm" onclick="addScreening()">+ Add Screening</button>
+        <button class="btn btn-ok btn-sm" id="pasteBtn" onclick="pasteIntoModal()" disabled>Paste</button>
       </div>
     </div>
     <div class="modal-footer">
@@ -774,7 +847,8 @@
 //  screeningObj = {
 //    cinema:           'C1' | 'C2' | 'Rivoli' | 'RivoliRevival' | 'Other',
 //    slotOrder:        number,   // 1 = Early Show, 2 = Late Show (where applicable)
-//    type:             'regular' | 'midnight' | 'rivoli' | 'rivolirevival' | 'rental' | 'other',
+//    type:             'regular' | 'midnight' | 'rivoli' | 'rivolirevival'
+//                      | 'rental' | 'festival' | 'trivia' | 'other',
 //    showSlot:         'early' | 'late' | 'single'  // derived from slotOrder + cinema type
 //    afterHours:       boolean   // screening is outside regular operating hours
 //    slotStart:        string    // 'HH:MM' start time (after-hours only)
@@ -797,26 +871,46 @@ const TYPE_LABELS = {
   rivoli:       'Rivoli',
   rivolirevival:'Rivoli Revival',
   rental:       'Rental/Event',
+  festival:     'Film Festival',
+  trivia:       'Trivia Night',
   other:        'Other'
 };
 
+const CINEMA_LABELS = {
+  C1:            'Cinema 1',
+  C2:            'Cinema 2',
+  Rivoli:        'Rivoli',
+  RivoliRevival: 'Rivoli Revival',
+  Other:         'Other Screen'
+};
+
 // Which cinemas/types support Early + Late slots vs single only
-const MULTI_SLOT_TYPES = new Set(['regular', 'rivoli', 'rental']);
+const MULTI_SLOT_TYPES = new Set(['regular', 'rivoli', 'rental', 'festival', 'trivia']);
+// Types that can be booked outside regular operating hours (start/end time fields)
+const AFTER_HOURS_TYPES = new Set(['rental', 'other', 'festival', 'trivia']);
+// Types whose main title is an event name rather than a film title
+const EVENT_TYPES = new Set(['rental', 'trivia', 'other']);
 // Physical room groupings for conflict detection (Rivoli and RivoliRevival share a room)
 const PHYSICAL_ROOM = { C1:'C1', C2:'C2', Rivoli:'Rivoli', RivoliRevival:'Rivoli', Other:'Other' };
+
+function titleFieldLabel(type) {
+  if (type === 'trivia') return 'Trivia Night Title';
+  if (EVENT_TYPES.has(type)) return 'Event Title';
+  return 'Film Title';
+}
 
 function fmtTime12(t) {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12  = h % 12 || 12;
-  return h12 + (m ? ':' + String(m).padStart(2,'0') : '') + ' ' + ampm;
+  return h12 + (m ? ':' + String(m).padStart(2,'0') : '') + ' ' + ampm;
 }
 
 function slotLabel(s) {
   if (!MULTI_SLOT_TYPES.has(s.type)) return 'Single';
   if (s.type === 'rivolirevival') return 'Single';
-  if ((s.type === 'rental' || s.type === 'other') && s.afterHours) {
+  if (AFTER_HOURS_TYPES.has(s.type) && s.afterHours) {
     if (s.slotStart && s.slotEnd)     return fmtTime12(s.slotStart) + '–' + fmtTime12(s.slotEnd);
     if (s.slotStart && s.slotDuration) return fmtTime12(s.slotStart) + ' (' + s.slotDuration + 'min)';
     if (s.slotStart)                   return fmtTime12(s.slotStart);
@@ -844,7 +938,7 @@ function load() {
 // Two conflict types:
 // 1. Slot conflict: two screenings share the same physical room AND same named slot
 //    (Early/Late/Single). Midnight and after-hours screenings are exempt.
-// 2. Time-window conflict: an after-hours rental/event/other with a specified time range
+// 2. Time-window conflict: an after-hours booking with a specified time range
 //    overlaps the fixed Early Show window (5:01pm–7pm) or Late Show window (7pm–10:30pm)
 //    in the same physical room as a scheduled Early or Late screening.
 
@@ -910,7 +1004,7 @@ function findConflicts(screenings) {
   // ── Type 2: after-hours time-window conflicts ──
   const afterHours = screenings.filter(s =>
     s.afterHours && s.slotStart && (s.slotEnd || s.slotDuration) &&
-    (s.type === 'rental' || s.type === 'other')
+    AFTER_HOURS_TYPES.has(s.type)
   );
 
   afterHours.forEach(ah => {
@@ -966,11 +1060,119 @@ function conflictMessage(screenings) {
         return name + ': after-hours event overlaps Late Show window (7\u201310:30pm)';
       return name + ': conflict';
     });
-    return { level: 'bad', msg: '\u26a0 ' + msgs.join(' \u00b7 ') };
+    const lines = conflicts.map(c => c.detail).filter(Boolean);
+    return { level: 'bad', msg: '\u26a0 ' + [...new Set(msgs)].join(' \u00b7 '), lines };
   }
 
   const total = active.length;
   return { level: 'ok', msg: '\u2713 ' + total + ' screening' + (total > 1 ? 's' : '') + ' \u2014 no conflicts' };
+}
+
+// ─── Slot assignment helper ───────────────────
+// Places `s` in a free slot within `list` (the other screenings sharing that day).
+// Keeps the screening's own slot when it's free; otherwise tries the opposite
+// Early/Late slot, then falls back to the next unused slot number.
+function assignFreeSlot(s, list) {
+  if (s.type === 'midnight' || s.afterHours) return s;
+  const sibs = list.filter(x => x !== s && x.cinema === s.cinema && x.type !== 'midnight' && !x.afterHours);
+  if (!sibs.length) return s;
+  const taken = n => sibs.some(x => (x.slotOrder || 1) === n);
+  const mine  = s.slotOrder || 1;
+  if (!taken(mine)) return s;
+  if (MULTI_SLOT_TYPES.has(s.type)) {
+    const alt = mine === 1 ? 2 : 1;
+    if (!taken(alt)) { s.slotOrder = alt; return s; }
+  }
+  s.slotOrder = Math.max(...sibs.map(x => x.slotOrder || 1)) + 1;
+  return s;
+}
+
+// ─── Copy / paste ─────────────────────────────
+let clipboardScreening = null;
+let pasteMode = false;
+
+function clipSummary(s) {
+  const t = programTitle(s) || '(untitled)';
+  return t + '  ·  ' + cinemaPrettyName(s.cinema) + '  ·  ' + slotLabel(s);
+}
+
+function copyScreening(idx) {
+  clipboardScreening = JSON.parse(JSON.stringify(editingScreenings[idx]));
+  renderClipBar();
+}
+
+function copyScreeningFromDate(ds, idx) {
+  const s = (calendarData[ds] || [])[idx];
+  if (!s) return;
+  clipboardScreening = JSON.parse(JSON.stringify(s));
+  renderClipBar();
+}
+
+function clearClipboard() {
+  clipboardScreening = null;
+  setPasteMode(false);
+  renderClipBar();
+}
+
+function renderClipBar() {
+  const bar = document.getElementById('clipBar');
+  const pasteBtn = document.getElementById('pasteBtn');
+  if (clipboardScreening) {
+    document.getElementById('clipTitle').textContent = clipSummary(clipboardScreening);
+    bar.classList.add('show');
+    if (pasteBtn) {
+      pasteBtn.disabled = false;
+      pasteBtn.textContent = 'Paste "' + (programTitle(clipboardScreening) || 'untitled').substring(0, 24) + '"';
+    }
+  } else {
+    bar.classList.remove('show');
+    if (pasteBtn) { pasteBtn.disabled = true; pasteBtn.textContent = 'Paste'; }
+  }
+  const pmBtn = document.getElementById('pasteModeBtn');
+  if (pmBtn) pmBtn.textContent = 'Paste on click: ' + (pasteMode ? 'on' : 'off');
+}
+
+function setPasteMode(on) {
+  pasteMode = on && !!clipboardScreening;
+  document.body.classList.toggle('paste-mode', pasteMode);
+  renderClipBar();
+}
+
+function togglePasteMode() { setPasteMode(!pasteMode); }
+
+// Paste the clipboard screening straight into a calendar date
+function pasteIntoDate(ds) {
+  if (!clipboardScreening) return;
+  const dupe = JSON.parse(JSON.stringify(clipboardScreening));
+  const list = JSON.parse(JSON.stringify(calendarData[ds] || []));
+  assignFreeSlot(dupe, list);
+  list.push(dupe);
+  calendarData[ds] = list;
+  save();
+  renderAll();
+  flashCell(ds);
+}
+
+// Paste into the day currently open in the edit modal
+function pasteIntoModal() {
+  if (!clipboardScreening) return;
+  const dupe = JSON.parse(JSON.stringify(clipboardScreening));
+  assignFreeSlot(dupe, editingScreenings);
+  editingScreenings.push(dupe);
+  renderModalScreenings();
+  const list = document.getElementById('screeningList');
+  list.lastElementChild?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function flashCell(ds) {
+  setTimeout(() => {
+    document.querySelectorAll('.cal-cell').forEach(cell => {
+      if (cell.dataset.date === ds) {
+        cell.style.outline = '2px solid var(--ok)';
+        setTimeout(() => { cell.style.outline = ''; }, 900);
+      }
+    });
+  }, 50);
 }
 
 
@@ -1231,11 +1433,7 @@ function onCellDrop(e) {
 
   // Add to target — preserve slot exactly, only bump on genuine conflict
   const tgtList = JSON.parse(JSON.stringify(calendarData[targetDate] || []));
-  const sibsOnTarget = tgtList.filter(s => s.cinema === moving.cinema);
-  const slotTaken = sibsOnTarget.some(s => (s.slotOrder || 1) === (moving.slotOrder || 1));
-  if (slotTaken) {
-    moving.slotOrder = Math.max(...sibsOnTarget.map(s => s.slotOrder || 1)) + 1;
-  }
+  assignFreeSlot(moving, tgtList);
   tgtList.push(moving);
 
   if (srcList.length > 0) {
@@ -1247,15 +1445,7 @@ function onCellDrop(e) {
 
   save();
   renderAll();
-
-  setTimeout(() => {
-    document.querySelectorAll('.cal-cell').forEach(cell => {
-      if (cell.dataset.date === targetDate) {
-        cell.style.outline = '2px solid var(--ok)';
-        setTimeout(() => { cell.style.outline = ''; }, 900);
-      }
-    });
-  }, 50);
+  flashCell(targetDate);
 }
 
 
@@ -1282,7 +1472,11 @@ function renderCalendar() {
     const cell = document.createElement('div');
     cell.className = 'cal-cell';
     cell.dataset.date = ds;
-    cell.onclick = (e) => { if (e.target.closest('[draggable]')) return; openModal(ds); };
+    cell.onclick = (e) => {
+      if (e.target.closest('[draggable]')) return;
+      if (pasteMode && clipboardScreening) { pasteIntoDate(ds); return; }
+      openModal(ds);
+    };
 
     const scrns = calendarData[ds] || [];
 
@@ -1319,6 +1513,7 @@ function renderCalendar() {
       const chip = document.createElement('div');
       chip.className = 'chip ' + s.type;
       chip.textContent = label;
+      chip.title = 'Right-click to copy · drag to move';
       chip.draggable = true;
       chip.dataset.srcDate = ds;
       chip.dataset.srcIdx  = sIdx;
@@ -1326,6 +1521,13 @@ function renderCalendar() {
       chip.dataset.srcData = JSON.stringify(s);
       chip.addEventListener('dragstart', onChipDragStart);
       chip.addEventListener('click', e => e.stopPropagation());
+      // Right-click a chip to copy it to the clipboard
+      chip.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        copyScreeningFromDate(ds, sIdx);
+        setPasteMode(true);
+      });
       chipsWrap.appendChild(chip);
     });
 
@@ -1483,6 +1685,7 @@ function openModal(ds) {
 
   editingScreenings = JSON.parse(JSON.stringify(calendarData[ds] || []));
   renderModalScreenings();
+  renderClipBar();
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -1497,7 +1700,7 @@ function renderModalScreenings() {
   list.innerHTML = '';
 
   // Group screenings by cinema, sorted by slotOrder within each cinema
-  const cinemaOrder = ['C1','C2','Rivoli','Other'];
+  const cinemaOrder = ['C1','C2','Rivoli','RivoliRevival','Other'];
   const byCinema = {};
   editingScreenings.forEach((s, idx) => {
     if (!byCinema[s.cinema]) byCinema[s.cinema] = [];
@@ -1534,26 +1737,41 @@ function renderModalScreenings() {
 
       const isComp = s.isCompilation;
 
+      // Quick "move to the other cinema" button — only for Cinema 1 / Cinema 2
+      const swapBtn = (s.cinema === 'C1' || s.cinema === 'C2')
+        ? `<button class="slot-btn" onclick="swapCinema(${idx})" title="Switch this screening between Cinema 1 and Cinema 2">&#8646; Move to Cinema ${s.cinema === 'C1' ? '2' : '1'}</button>`
+        : '';
+
       block.innerHTML = `
         <div class="screening-block-head">
           <span class="scr-num">${slotLabel(s)}</span>
           <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
+            ${swapBtn}
+            <button class="dupe-btn" onclick="copyScreening(${idx})" title="Copy this screening">&#x2398; Copy</button>
             <button class="dupe-btn" onclick="duplicateScreening(${idx})" title="Duplicate">&#x29C9; Duplicate</button>
             <button class="remove-btn" onclick="removeScreening(${idx})" title="Remove">✕</button>
           </div>
         </div>
         <div class="screening-block-body">
-          <!-- Row: type + show slot (Early/Late where applicable) -->
-          <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:end">
+          <!-- Row: cinema + type + show slot (Early/Late where applicable) -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 130px;gap:8px;align-items:end">
+            <div>
+              <label class="field-label">Cinema / Location</label>
+              <select class="cinema-select" onchange="changeCinema(${idx}, this.value)">
+                ${Object.entries(CINEMA_LABELS).map(([v,l]) =>
+                  `<option value="${v}" ${s.cinema===v?'selected':''}>${l}</option>`
+                ).join('')}
+              </select>
+            </div>
             <div>
               <label class="field-label">Screening Type</label>
-              <select class="type-select t-${s.type}" onchange="updateScreeningField(${idx},'type',this.value);updateTypeColor(this)">
+              <select class="type-select t-${s.type}" onchange="changeType(${idx}, this.value)">
                 ${Object.entries(TYPE_LABELS).map(([v,l]) =>
                   `<option value="${v}" ${s.type===v?'selected':''}>${l}</option>`
                 ).join('')}
               </select>
             </div>
-            <div id="showslot-wrap-${idx}" ${(s.afterHours && (s.type==='rental'||s.type==='other')) ? 'style="display:none"' : ''}>
+            <div id="showslot-wrap-${idx}" ${(s.afterHours && AFTER_HOURS_TYPES.has(s.type)) ? 'style="display:none"' : ''}>
               <label class="field-label">Show Slot</label>
               ${MULTI_SLOT_TYPES.has(s.type) && s.type !== 'rivolirevival' ? `
               <select id="showslot-${idx}" onchange="updateSlotOrder(${idx}, this.value)">
@@ -1566,8 +1784,8 @@ function renderModalScreenings() {
             </div>
           </div>
 
-          <!-- After-hours ticker + time fields: only for Rental/Event and Other -->
-          ${(s.type === 'rental' || s.type === 'other') ? `
+          <!-- After-hours ticker + time fields: Rental/Event, Film Festival, Trivia Night, Other -->
+          ${AFTER_HOURS_TYPES.has(s.type) ? `
           <div class="comp-toggle-row">
             <input type="checkbox" id="afterhours-${idx}" ${s.afterHours?'checked':''}
               onchange="updateScreeningField(${idx},'afterHours',this.checked);toggleAfterHoursSlot(${idx},this.checked)">
@@ -1615,25 +1833,23 @@ function renderModalScreenings() {
 
           <!-- Films area -->
           <div id="films-area-${idx}">
-            ${isComp ? buildCompFilmsHTML(idx, s.films) : buildSingleFilmHTML(idx, s.films[0]||{title:'',year:''})}
+            ${isComp ? buildCompFilmsHTML(idx, s.films) : buildSingleFilmHTML(idx, s.films[0]||{title:'',year:''}, s.type)}
           </div>
         </div>
       `;
       list.appendChild(block);
-
-      // Start time — just trigger conflict recheck on change (already handled via oninput above)
     });
   });
 
   updateConflictSummary();
 }
 
-function buildSingleFilmHTML(idx, film) {
+function buildSingleFilmHTML(idx, film, type) {
   return `
     <div class="row3" id="single-film-${idx}">
       <div>
-        <label class="field-label">Film Title</label>
-        <input type="text" placeholder="Film title…"
+        <label class="field-label">${titleFieldLabel(type)}</label>
+        <input type="text" placeholder="${EVENT_TYPES.has(type) ? 'Event title…' : 'Film title…'}"
           value="${esc(film.title||'')}"
           onchange="updateFilm(${idx},0,'title',this.value)"
           oninput="updateFilm(${idx},0,'title',this.value)">
@@ -1702,7 +1918,37 @@ function updateFilm(idx, fi, field, value) {
 }
 
 function cinemaPrettyName(c) {
-  return { C1:'Cinema 1', C2:'Cinema 2', Rivoli:'Rivoli', RivoliRevival:'Rivoli Revival', Other:'Other Screen' }[c] || c;
+  return CINEMA_LABELS[c] || c;
+}
+
+// Move a screening to a different cinema/location, keeping its slot when free
+function changeCinema(idx, val) {
+  const s = editingScreenings[idx];
+  s.cinema = val;
+  assignFreeSlot(s, editingScreenings);
+  renderModalScreenings();
+  setTimeout(() => {
+    document.getElementById('scr-block-' + idx)?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }, 30);
+}
+
+// One-click toggle between Cinema 1 and Cinema 2
+function swapCinema(idx) {
+  const s = editingScreenings[idx];
+  changeCinema(idx, s.cinema === 'C1' ? 'C2' : 'C1');
+}
+
+// Changing type can add/remove the after-hours fields, so re-render the block
+function changeType(idx, val) {
+  const s = editingScreenings[idx];
+  s.type = val;
+  if (!AFTER_HOURS_TYPES.has(val)) {
+    s.afterHours   = false;
+    s.slotStart    = '';
+    s.slotEnd      = '';
+    s.slotDuration = '';
+  }
+  renderModalScreenings();
 }
 
 function updateSlotOrder(idx, val) {
@@ -1789,7 +2035,7 @@ function toggleCompilation(idx, isComp) {
   } else {
     const first = editingScreenings[idx].films[0] || { title:'', year:'' };
     editingScreenings[idx].films = [first];
-    area.innerHTML = buildSingleFilmHTML(idx, first);
+    area.innerHTML = buildSingleFilmHTML(idx, first, editingScreenings[idx].type);
   }
 }
 
@@ -1813,14 +2059,9 @@ function removeCompFilm(idx, fi) {
 function addScreening() {
   const cinema = document.getElementById('newScreeningCinema').value;
   const type   = document.getElementById('newScreeningType').value;
-  // Auto-assign next slot order for this cinema
-  const existingInCinema = editingScreenings.filter(s => s.cinema === cinema);
-  const nextSlot = existingInCinema.length > 0
-    ? Math.max(...existingInCinema.map(s => s.slotOrder || 1)) + 1
-    : 1;
-  editingScreenings.push({
+  const s = {
     cinema,
-    slotOrder: nextSlot,
+    slotOrder: 1,
     type,
     afterHours: false,
     slotStart: '',
@@ -1829,7 +2070,9 @@ function addScreening() {
     isCompilation: false,
     compilationTitle: '',
     films: [{ title:'', year:'' }]
-  });
+  };
+  assignFreeSlot(s, editingScreenings);
+  editingScreenings.push(s);
   renderModalScreenings();
   const list = document.getElementById('screeningList');
   list.lastElementChild?.scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -1853,7 +2096,7 @@ function fmtTime12From(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12  = h % 12 || 12;
-  return h12 + (m ? ':' + String(m).padStart(2,'0') : '') + ' ' + ampm;
+  return h12 + (m ? ':' + String(m).padStart(2,'0') : '') + ' ' + ampm;
 }
 function slotTimeRange(slot) {
   if (slot === 'early') return fmtTime12From(EARLY_START) + '–' + fmtTime12From(EARLY_END);
@@ -1907,13 +2150,7 @@ function confirmDuplicate() {
       }
     } else {
       // Different cinema on the same day: only bump if that exact slot is already taken there
-      const slotTaken = editingScreenings.some(s =>
-        s.cinema === targetCinema && (s.slotOrder || 1) === (dupe.slotOrder || 1)
-      );
-      if (slotTaken) {
-        const sibs = editingScreenings.filter(s => s.cinema === targetCinema);
-        dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
-      }
+      assignFreeSlot(dupe, editingScreenings);
     }
     editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
     closeDupeModal();
@@ -1936,13 +2173,7 @@ function confirmDuplicate() {
           dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
         }
       } else {
-        const slotTaken = editingScreenings.some(s =>
-          s.cinema === targetCinema && (s.slotOrder || 1) === (dupe.slotOrder || 1)
-        );
-        if (slotTaken) {
-          const sibs = editingScreenings.filter(s => s.cinema === targetCinema);
-          dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
-        }
+        assignFreeSlot(dupe, editingScreenings);
       }
       editingScreenings.splice(dupeSourceIdx + 1, 0, dupe);
       closeDupeModal(); renderModalScreenings(); return;
@@ -1951,26 +2182,12 @@ function confirmDuplicate() {
     // Different date: preserve the source's own slotOrder (Early/Late/Single) by default.
     // Only bump to the next free slot if that exact cinema+slot is already taken on the target day.
     const existing = JSON.parse(JSON.stringify(calendarData[targetDate] || []));
-    const slotTaken = existing.some(s =>
-      s.cinema === targetCinema && (s.slotOrder || 1) === (dupe.slotOrder || 1)
-    );
-    if (slotTaken) {
-      const sibs = existing.filter(s => s.cinema === targetCinema);
-      dupe.slotOrder = Math.max(...sibs.map(s => s.slotOrder || 1)) + 1;
-    }
-    // else: dupe.slotOrder already matches src.slotOrder — leave it as-is
+    assignFreeSlot(dupe, existing);
 
     existing.push(dupe);
     calendarData[targetDate] = existing;
     save(); renderAll(); closeDupeModal();
-    setTimeout(() => {
-      document.querySelectorAll('.cal-cell').forEach(cell => {
-        if (cell.dataset.date === targetDate) {
-          cell.style.outline = '2px solid var(--ok)';
-          setTimeout(() => { cell.style.outline = ''; }, 1200);
-        }
-      });
-    }, 100);
+    flashCell(targetDate);
   }
 }
 
@@ -1998,9 +2215,10 @@ function updateConflictSummary() {
 }
 
 function saveDay() {
-  // Strip empty screenings (no film title and not special)
+  // Strip empty screenings (no film/event title entered)
   const cleaned = editingScreenings.filter(s =>
-    s.films.some(f => f.title && f.title.trim() !== '')
+    (s.films || []).some(f => f.title && f.title.trim() !== '') ||
+    (s.isCompilation && s.compilationTitle && s.compilationTitle.trim() !== '')
   );
   if (cleaned.length > 0) {
     calendarData[editingDate] = cleaned;
@@ -2166,8 +2384,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('dupeModal')) closeDupeModal();
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeModal(); closeDupeModal(); }
+    if (e.key === 'Escape') {
+      if (pasteMode) { setPasteMode(false); return; }
+      closeModal(); closeDupeModal();
+    }
   });
+
+  renderClipBar();
 
   // Firebase init
   const firebaseConfig = {
