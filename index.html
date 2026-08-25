@@ -270,6 +270,131 @@
     .clip-bar .btn { white-space: nowrap; }
     .btn-ok { background: var(--ok); color: #fff; }
 
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 10px 14px;
+    }
+    .filter-bar .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+    }
+    .seg {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .seg-btn {
+      background: var(--surface);
+      border: none;
+      border-right: 1px solid var(--border);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: inherit;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .seg-btn:last-child { border-right: none; }
+    .seg-btn:hover { background: var(--surface2); color: var(--text); }
+    .seg-btn.active { background: var(--accent2); color: #fff; }
+    .filter-count { font-size: 12px; color: var(--muted); margin-left: auto; }
+    .filter-count strong { color: var(--text); }
+
+    .filter-custom {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 14px 4px;
+      margin-top: 2px;
+      border-top: 1px solid var(--border);
+      width: 100%;
+    }
+    .filter-custom.open { display: flex; }
+    .filter-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .filter-group-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted);
+      min-width: 66px;
+    }
+    .f-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .f-chip:hover { background: var(--surface2); }
+    .f-chip .f-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .45; }
+    .f-chip.on { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+    .f-chip.on .f-dot { opacity: 1; }
+    .f-link {
+      background: none;
+      border: none;
+      color: var(--accent2);
+      font-size: 11px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 2px 4px;
+    }
+    .filter-note {
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .hidden-count {
+      font-size: 9px;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 2px;
+    }
+
+    /* multi-entry table cells */
+    .cell-entry { padding: 2px 0; }
+    .cell-entry + .cell-entry { border-top: 1px dashed var(--border); margin-top: 3px; padding-top: 4px; }
+    .cell-loc {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      display: block;
+    }
+    .time-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
     /* ── Modal ── */
     .modal-overlay {
       display: none;
@@ -639,6 +764,35 @@
 </div>
 
 <div class="layout">
+  <div class="filter-bar" id="filterBar">
+    <span class="filter-label">Show</span>
+    <div class="seg">
+      <button class="seg-btn active" id="segAll" onclick="setFilterMode('all')">Everything</button>
+      <button class="seg-btn" id="segRegular" onclick="setFilterMode('regular')">Regular &mdash; Cinema 1 &amp; 2</button>
+      <button class="seg-btn" id="segCustom" onclick="setFilterMode('custom')">Custom</button>
+    </div>
+    <span class="filter-count" id="filterCount"></span>
+    <div class="filter-custom" id="filterCustom">
+      <div class="filter-group">
+        <span class="filter-group-label">Types</span>
+        <span id="filterTypeChips" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+        <button class="f-link" onclick="setAllFilterValues('types', true)">All</button>
+        <button class="f-link" onclick="setAllFilterValues('types', false)">None</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-group-label">Locations</span>
+        <span id="filterLocChips" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+        <button class="f-link" onclick="setAllFilterValues('locations', true)">All</button>
+        <button class="f-link" onclick="setAllFilterValues('locations', false)">None</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-group-label">Hours</span>
+        <button class="f-chip on" id="chip-afterhours" onclick="toggleAfterHoursFilter()"><span class="f-dot"></span>Include after-hours bookings</button>
+      </div>
+      <div class="filter-note">Conflicts are always checked against every screening on a day, filtered or not.</div>
+    </div>
+  </div>
+
   <div class="tab-panel active" id="tab-calendar">
     <div class="card">
       <div class="card-header">Calendar View <span style="font-size:10px;font-weight:400;opacity:.7;">click a day to edit</span></div>
@@ -1214,14 +1368,165 @@ function flashCell(ds) {
 
 
 
+// ─── View filter ──────────────────────────────
+// Applies to the calendar, all three tables and every export. The day editor
+// always shows everything, and conflict checks always run against the full day,
+// so filtering can never hide a double-booking.
+let filterState = {
+  mode: 'all',                                    // 'all' | 'regular' | 'custom'
+  types: new Set(Object.keys(TYPE_LABELS)),
+  locations: new Set(Object.keys(CINEMA_LABELS)),
+  afterHours: true
+};
+
+function passesFilter(s) {
+  if (filterState.mode === 'all') return true;
+  if (filterState.mode === 'regular') {
+    return s.type === 'regular' && (s.cinema === 'C1' || s.cinema === 'C2') && !s.afterHours;
+  }
+  if (s.afterHours && !filterState.afterHours) return false;
+  return filterState.types.has(s.type) && filterState.locations.has(s.cinema);
+}
+
+function visibleOn(ds) {
+  return (calendarData[ds] || []).filter(passesFilter);
+}
+
+// Date entries that still have something to show under the current filter
+function visibleEntries() {
+  return Object.entries(calendarData)
+    .map(([ds, list]) => [ds, (list || []).filter(passesFilter)])
+    .filter(([, list]) => list.length > 0)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function filterIsActive() { return filterState.mode !== 'all'; }
+
+function setFilterMode(mode) {
+  // Entering Custom starts from whatever is on screen right now
+  if (mode === 'custom' && filterState.mode === 'regular') {
+    filterState.types     = new Set(['regular']);
+    filterState.locations = new Set(['C1', 'C2']);
+    filterState.afterHours = false;
+  } else if (mode === 'custom' && filterState.mode === 'all') {
+    filterState.types     = new Set(Object.keys(TYPE_LABELS));
+    filterState.locations = new Set(Object.keys(CINEMA_LABELS));
+    filterState.afterHours = true;
+  }
+  filterState.mode = mode;
+  renderFilterBar();
+  renderAll();
+}
+
+function toggleFilterValue(kind, key) {
+  const set = filterState[kind];
+  set.has(key) ? set.delete(key) : set.add(key);
+  filterState.mode = 'custom';
+  renderFilterBar();
+  renderAll();
+}
+
+function setAllFilterValues(kind, on) {
+  const all = kind === 'types' ? Object.keys(TYPE_LABELS) : Object.keys(CINEMA_LABELS);
+  filterState[kind] = on ? new Set(all) : new Set();
+  filterState.mode = 'custom';
+  renderFilterBar();
+  renderAll();
+}
+
+function toggleAfterHoursFilter() {
+  filterState.afterHours = !filterState.afterHours;
+  filterState.mode = 'custom';
+  renderFilterBar();
+  renderAll();
+}
+
+function renderFilterBar() {
+  ['all','regular','custom'].forEach(m => {
+    const btn = document.getElementById('seg' + m.charAt(0).toUpperCase() + m.slice(1));
+    if (btn) btn.classList.toggle('active', filterState.mode === m);
+  });
+  document.getElementById('filterCustom').classList.toggle('open', filterState.mode === 'custom');
+
+  const typeWrap = document.getElementById('filterTypeChips');
+  if (typeWrap) {
+    typeWrap.innerHTML = Object.entries(TYPE_LABELS).map(([k, label]) =>
+      '<button class="f-chip ' + (filterState.types.has(k) ? 'on' : '') + '" onclick="toggleFilterValue(\'types\',\'' + k + '\')">'
+      + '<span class="f-dot" style="background:var(--' + k + ')"></span>' + label + '</button>'
+    ).join('');
+  }
+  const locWrap = document.getElementById('filterLocChips');
+  if (locWrap) {
+    locWrap.innerHTML = Object.entries(CINEMA_LABELS).map(([k, label]) =>
+      '<button class="f-chip ' + (filterState.locations.has(k) ? 'on' : '') + '" onclick="toggleFilterValue(\'locations\',\'' + k + '\')">'
+      + label + '</button>'
+    ).join('');
+  }
+  const ahChip = document.getElementById('chip-afterhours');
+  if (ahChip) ahChip.classList.toggle('on', filterState.afterHours);
+
+  // Count of what's showing vs what exists
+  let total = 0, shown = 0;
+  Object.values(calendarData).forEach(list => (list || []).forEach(s => {
+    total++;
+    if (passesFilter(s)) shown++;
+  }));
+  const countEl = document.getElementById('filterCount');
+  if (countEl) {
+    countEl.innerHTML = filterIsActive()
+      ? 'Showing <strong>' + shown + '</strong> of ' + total + ' screenings'
+      : '<strong>' + total + '</strong> screening' + (total === 1 ? '' : 's');
+  }
+}
+
+// ─── Shared column layout for the Screenings Table + its CSV ───
+// Screenings are placed into the first column they match; anything left over
+// (after-hours bookings, Other Screen events) lands in the catch-all column, so
+// no entry can silently vanish from the table the way after-hours ones used to.
+const SCREENING_COLS = [
+  { key:'c1e', label:'Program Title (Cinema 1) (Early Show)',   match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
+  { key:'c1l', label:'Program Title (Cinema 1) (Late Show)',    match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
+  { key:'c2e', label:'Program Title (Cinema 2) (Early Show)',   match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
+  { key:'c2l', label:'Program Title (Cinema 2) (Late Show)',    match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
+  { key:'mid', label:'Program Title (Midnight)',                match: s => s.type === 'midnight' },
+  { key:'riv', label:'Program Title (Rivoli / Rivoli Revival)', match: s => s.cinema === 'Rivoli' || s.cinema === 'RivoliRevival' },
+  { key:'evt', label:'Program Title (Events / After Hours)',    match: () => false, catchAll: true }
+];
+
+// Sort a day's screenings into the columns above
+function bucketDay(scrns) {
+  const buckets = {};
+  SCREENING_COLS.forEach(c => buckets[c.key] = []);
+  scrns.forEach(s => {
+    const col = SCREENING_COLS.find(c => c.match(s));
+    buckets[col ? col.key : 'evt'].push(s);
+  });
+  return buckets;
+}
+
+// Plain-text title for a screening as it appears in the tables/CSV
+function cellTitle(s) {
+  return s.isCompilation
+    ? (s.compilationTitle || s.films.map(f => f.title).filter(Boolean).join(' / '))
+    : (s.films[0]?.title || '');
+}
+
+function cellHTML(s, showLocation) {
+  const t    = cellTitle(s);
+  const body = t ? (s.isCompilation ? '<em>' + t + '</em>' : t) : '<span style="color:var(--muted)">(untitled)</span>';
+  const loc  = showLocation ? '<span class="cell-loc">' + cinemaPrettyName(s.cinema) + '</span>' : '';
+  const pill = s.type !== 'regular'
+    ? ' <span class="type-pill ' + s.type + '">' + TYPE_LABELS[s.type] + '</span>' : '';
+  const time = s.afterHours ? ' <span class="time-pill">' + slotLabel(s) + '</span>' : '';
+  return '<div class="cell-entry">' + loc + body + pill + time + '</div>';
+}
+
 // ─── Master Tracker (DB view) ─────────────────
 function dbRows() {
   const rows = [];
   let eventId = 1;
 
-  Object.entries(calendarData)
-    .filter(([,v]) => v.length > 0)
-    .sort((a,b) => a[0].localeCompare(b[0]))
+  visibleEntries()
     .forEach(([ds, scrns]) => {
       // Group screenings on this date by their program title.
       // Same program playing Early + Late (or across cinemas) = one Event ID.
@@ -1295,7 +1600,10 @@ function renderDbTable() {
   const rows = dbRows();
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">No screenings yet — click a day on the calendar to add.</td></tr>';
+    const msg = filterIsActive()
+      ? 'Nothing matches the current filter — try Everything.'
+      : 'No screenings yet — click a day on the calendar to add.';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">' + msg + '</td></tr>';
     return;
   }
 
@@ -1540,7 +1848,11 @@ function renderCalendar() {
     const chipsWrap = document.createElement('div');
     chipsWrap.className = 'cal-chips';
 
+    let hiddenCount = 0;
     scrns.forEach((s, sIdx) => {
+      // Skip filtered-out screenings, but keep sIdx pointing at the real record
+      // so drag-to-move and right-click-to-copy still target the right entry.
+      if (!passesFilter(s)) { hiddenCount++; return; }
       const displayTitle = s.isCompilation && s.compilationTitle
         ? s.compilationTitle
         : (s.films[0]?.title || '(untitled)');
@@ -1567,6 +1879,13 @@ function renderCalendar() {
       });
       chipsWrap.appendChild(chip);
     });
+
+    if (hiddenCount > 0) {
+      const note = document.createElement('div');
+      note.className = 'hidden-count';
+      note.textContent = '+' + hiddenCount + ' hidden';
+      chipsWrap.appendChild(note);
+    }
 
     cell.appendChild(chipsWrap);
 
@@ -1596,33 +1915,22 @@ function renderScreeningsTable() {
   const tbody = document.getElementById('screeningsTbody');
   tbody.innerHTML = '';
 
-  const entries = Object.entries(calendarData)
-    .filter(([,v]) => v.length > 0)
-    .sort((a,b) => a[0].localeCompare(b[0]));
+  const entries = visibleEntries();
 
-  if (entries.length === 0) {
-    thead.innerHTML = '<tr><th>Date</th><th>Day</th><th>Program Title (Cinema 1) (Early Show)</th><th>Program Title (Cinema 1) (Late Show)</th><th>Program Title (Cinema 2) (Early Show)</th><th>Program Title (Cinema 2) (Late Show)</th><th>Program Title (Midnight)</th><th>Program Title (Rivoli / Rivoli Revival)</th></tr>';
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">No screenings yet — click a day to add.</td></tr>';
-    return;
-  }
-
-  // Fixed column definitions — each maps to a function that finds the matching screening
-  const COLS = [
-    { label: 'Program Title (Cinema 1) (Early Show)',     match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
-    { label: 'Program Title (Cinema 1) (Late Show)',      match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
-    { label: 'Program Title (Cinema 2) (Early Show)',     match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
-    { label: 'Program Title (Cinema 2) (Late Show)',      match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
-    { label: 'Program Title (Midnight)',                  match: s => s.type === 'midnight' },
-    { label: 'Program Title (Rivoli / Rivoli Revival)',   match: s => s.cinema === 'Rivoli' || s.cinema === 'RivoliRevival' },
-  ];
-
-  // Fixed header
+  // Header is fixed so downstream sheets keep the same shape
   let hdrHTML = '<tr><th>Date</th><th>Day</th>';
-  COLS.forEach(col => { hdrHTML += '<th>' + col.label + '</th>'; });
+  SCREENING_COLS.forEach(col => { hdrHTML += '<th>' + col.label + '</th>'; });
   hdrHTML += '</tr>';
   thead.innerHTML = hdrHTML;
 
-  // One row per date
+  if (entries.length === 0) {
+    const msg = filterIsActive()
+      ? 'Nothing matches the current filter — try Everything.'
+      : 'No screenings yet — click a day to add.';
+    tbody.innerHTML = '<tr><td colspan="' + (SCREENING_COLS.length + 2) + '" class="empty-msg">' + msg + '</td></tr>';
+    return;
+  }
+
   entries.forEach(([ds, scrns]) => {
     const date = new Date(ds + 'T00:00:00');
     const dow  = DAYS[date.getDay()];
@@ -1630,20 +1938,12 @@ function renderScreeningsTable() {
     row.className = 'clickable';
     row.onclick = () => openModal(ds);
 
+    const buckets = bucketDay(scrns);
     let html = '<td>' + ds + '</td><td>' + dow + '</td>';
 
-    COLS.forEach(col => {
-      const match = scrns.find(col.match);
-      if (!match) {
-        html += '<td></td>';
-      } else {
-        const pt = match.isCompilation
-          ? (match.compilationTitle || match.films.map(f => f.title).join(' / '))
-          : (match.films[0]?.title || '');
-        const pill = match.type !== 'regular' ? ' <span class="type-pill ' + match.type + '">' + TYPE_LABELS[match.type] + '</span>' : '';
-        const afterTag = match.afterHours ? ' <span class="conflict-pill">After Hours</span>' : '';
-        html += '<td>' + (pt ? (match.isCompilation ? '<em>' + pt + '</em>' : pt) : '') + pill + afterTag + '</td>';
-      }
+    SCREENING_COLS.forEach(col => {
+      const list = buckets[col.key];
+      html += '<td>' + list.map(s => cellHTML(s, col.key === 'evt')).join('') + '</td>';
     });
 
     row.innerHTML = html;
@@ -1655,41 +1955,41 @@ function renderFilmsTable() {
   const thead = document.getElementById('filmsThead');
   const tbody = document.getElementById('filmsTbody');
 
-  const filmMap = {}; // key -> { title, year, isCompilation, dates[] }
+  const filmMap = {}; // key -> { title, year, isCompilation, types:Set, dates[] }
 
-  Object.entries(calendarData)
-    .filter(([,v]) => v.length > 0)
-    .sort((a,b) => a[0].localeCompare(b[0]))
-    .forEach(([ds, scrns]) => {
-      scrns.forEach(s => {
-        if (s.isCompilation) {
-          // Use the block/program title as the entry; fall back to joined film titles
-          const blockTitle = s.compilationTitle
-            || s.films.map(f => f.title).filter(Boolean).join(' / ')
-            || '(untitled compilation)';
-          const k = 'COMP|||' + blockTitle;
-          if (!filmMap[k]) filmMap[k] = { title: blockTitle, year: '', isCompilation: true, dates: [] };
-          if (!filmMap[k].dates.includes(ds)) filmMap[k].dates.push(ds);
-        } else {
-          s.films.forEach(f => {
-            if (!f.title) return;
-            const k = f.title + '|||' + (f.year||'');
-            if (!filmMap[k]) filmMap[k] = { title: f.title, year: f.year||'', isCompilation: false, dates: [] };
-            if (!filmMap[k].dates.includes(ds)) filmMap[k].dates.push(ds);
-          });
-        }
-      });
+  const track = (k, seed, ds, type) => {
+    if (!filmMap[k]) filmMap[k] = { ...seed, types: new Set(), dates: [] };
+    filmMap[k].types.add(type);
+    if (!filmMap[k].dates.includes(ds)) filmMap[k].dates.push(ds);
+  };
+
+  visibleEntries().forEach(([ds, scrns]) => {
+    scrns.forEach(s => {
+      if (s.isCompilation) {
+        // Use the block/program title as the entry; fall back to joined film titles
+        const blockTitle = s.compilationTitle
+          || s.films.map(f => f.title).filter(Boolean).join(' / ')
+          || '(untitled compilation)';
+        track('COMP|||' + blockTitle, { title: blockTitle, year: '', isCompilation: true }, ds, s.type);
+      } else {
+        s.films.forEach(f => {
+          if (!f.title) return;
+          track(f.title + '|||' + (f.year||''), { title: f.title, year: f.year||'', isCompilation: false }, ds, s.type);
+        });
+      }
     });
+  });
 
   const sorted = Object.values(filmMap).sort((a,b) => a.title.localeCompare(b.title));
   if (sorted.length === 0) {
-    thead.innerHTML = '<tr><th>Film / Program</th><th>Year</th></tr>';
-    tbody.innerHTML = '<tr><td colspan="2" class="empty-msg">No films yet.</td></tr>';
+    thead.innerHTML = '<tr><th>Film / Program</th><th>Year</th><th>Type(s)</th></tr>';
+    const msg = filterIsActive() ? 'Nothing matches the current filter.' : 'No films yet.';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-msg">' + msg + '</td></tr>';
     return;
   }
 
   const maxDates = Math.max(...sorted.map(f => f.dates.length));
-  let hdr = '<tr><th>Film / Program</th><th>Year</th>';
+  let hdr = '<tr><th>Film / Program</th><th>Year</th><th>Type(s)</th>';
   for (let i = 1; i <= maxDates; i++) hdr += '<th>Date ' + i + '</th>';
   hdr += '</tr>';
   thead.innerHTML = hdr;
@@ -1699,7 +1999,11 @@ function renderFilmsTable() {
     const titleCell = f.isCompilation
       ? '<em>' + f.title + '</em> <span class="yes-pill">Compilation</span>'
       : '<strong>' + f.title + '</strong>';
-    let row = '<tr><td>' + titleCell + '</td><td>' + f.year + '</td>';
+    // A title can play as more than one kind of program (e.g. Regular and Film Festival)
+    const typeCell = [...f.types].map(t =>
+      '<span class="type-pill ' + t + '">' + (TYPE_LABELS[t] || t) + '</span>'
+    ).join(' ');
+    let row = '<tr><td>' + titleCell + '</td><td>' + f.year + '</td><td style="white-space:nowrap">' + typeCell + '</td>';
     for (let i = 0; i < maxDates; i++) row += '<td>' + (f.dates[i]||'') + '</td>';
     row += '</tr>';
     tbody.innerHTML += row;
@@ -1707,6 +2011,7 @@ function renderFilmsTable() {
 }
 
 function renderAll() {
+  renderFilterBar();
   renderCalendar();
   renderScreeningsTable();
   renderFilmsTable();
@@ -2301,9 +2606,7 @@ function goToday()   { currentDate = new Date(); renderCalendar(); }
 // ─── Export ──────────────────────────────────
 function flatRows() {
   const rows = [];
-  Object.entries(calendarData)
-    .filter(([,v]) => v.length > 0)
-    .sort((a,b) => a[0].localeCompare(b[0]))
+  visibleEntries()
     .forEach(([ds, scrns]) => {
       const date = new Date(ds+'T00:00:00');
       const dow  = DAYS[date.getDay()];
@@ -2341,33 +2644,29 @@ function flatRows() {
 }
 
 function exportScreeningsCSV() {
-  const entries = Object.entries(calendarData)
-    .filter(([,v]) => v.length > 0)
-    .sort((a,b) => a[0].localeCompare(b[0]));
+  const entries = visibleEntries();
   if (!entries.length) { alert('No data to export'); return; }
-
-  const COLS = [
-    { label: 'Program Title (Cinema 1) (Early Show)',   match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
-    { label: 'Program Title (Cinema 1) (Late Show)',    match: s => s.cinema === 'C1' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
-    { label: 'Program Title (Cinema 2) (Early Show)',   match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 1 },
-    { label: 'Program Title (Cinema 2) (Late Show)',    match: s => s.cinema === 'C2' && !s.afterHours && s.type !== 'midnight' && slotIndex(s) === 2 },
-    { label: 'Program Title (Midnight)',                match: s => s.type === 'midnight' },
-    { label: 'Program Title (Rivoli / Rivoli Revival)', match: s => s.cinema === 'Rivoli' || s.cinema === 'RivoliRevival' },
-  ];
 
   const q = v => '"' + String(v||'').replace(/"/g,'""') + '"';
 
-  let csv = ['Date', 'Day', ...COLS.map(c => c.label)].join(',') + '\n';
+  // Same columns as the on-screen table, including the Events / After Hours catch-all
+  let csv = ['Date', 'Day', ...SCREENING_COLS.map(c => c.label)].join(',') + '\n';
 
   entries.forEach(([ds, scrns]) => {
     const dow = DAYS[new Date(ds + 'T00:00:00').getDay()];
-    const cells = COLS.map(col => {
-      const s = scrns.find(col.match);
-      if (!s) return '""';
-      const title = s.isCompilation
-        ? (s.compilationTitle || s.films.map(f => f.title).join(' / '))
-        : (s.films[0]?.title || '');
-      return q(title);
+    const buckets = bucketDay(scrns);
+    const cells = SCREENING_COLS.map(col => {
+      const list = buckets[col.key];
+      if (!list.length) return '""';
+      // More than one entry in a column (a conflict, or several events) — keep both
+      return q(list.map(s => {
+        const t = cellTitle(s) || '(untitled)';
+        if (col.key !== 'evt') return t;
+        // The catch-all column spans rooms and times, so spell those out
+        return cinemaPrettyName(s.cinema) + ': ' + t
+          + (s.afterHours ? ' (' + slotLabel(s) + ')' : '')
+          + (s.type !== 'regular' ? ' [' + TYPE_LABELS[s.type] + ']' : '');
+      }).join(' // '));
     });
     csv += [q(ds), q(dow), ...cells].join(',') + '\n';
   });
@@ -2381,32 +2680,33 @@ function exportScreeningsJSON() {
   dl(JSON.stringify(rows, null, 2), 'screenings.json', 'application/json');
 }
 
-function exportFilmsCSV() {
+function filmSummary() {
   const filmMap = {};
   flatRows().forEach(r => {
     const k = `${r.film_title}|||${r.film_year}`;
-    if (!filmMap[k]) filmMap[k] = { title: r.film_title, year: r.film_year, dates: [] };
+    if (!filmMap[k]) filmMap[k] = { title: r.film_title, year: r.film_year, types: [], dates: [] };
+    const label = TYPE_LABELS[r.type] || r.type;
+    if (!filmMap[k].types.includes(label)) filmMap[k].types.push(label);
     if (!filmMap[k].dates.includes(r.date)) filmMap[k].dates.push(r.date);
   });
-  const sorted = Object.values(filmMap).sort((a,b)=>a.title.localeCompare(b.title));
+  return Object.values(filmMap).sort((a,b)=>a.title.localeCompare(b.title));
+}
+
+function exportFilmsCSV() {
+  const sorted = filmSummary();
   if (!sorted.length) { alert('No films to export'); return; }
+  const q = v => '"' + String(v||'').replace(/"/g,'""') + '"';
   const maxD = Math.max(...sorted.map(f=>f.dates.length));
-  let csv = 'Film,Year,' + Array.from({length:maxD},(_,i)=>`Date ${i+1}`).join(',') + '\n';
+  let csv = 'Film,Year,Type(s),' + Array.from({length:maxD},(_,i)=>`Date ${i+1}`).join(',') + '\n';
   sorted.forEach(f => {
-    csv += `"${f.title.replace(/"/g,'""')}",${f.year},`+
-      Array.from({length:maxD},(_,i)=>f.dates[i]||'').join(',') + '\n';
+    csv += [q(f.title), f.year, q(f.types.join(' // ')),
+      ...Array.from({length:maxD},(_,i)=>f.dates[i]||'')].join(',') + '\n';
   });
   dl(csv, 'films.csv', 'text/csv');
 }
 
 function exportFilmsJSON() {
-  const filmMap = {};
-  flatRows().forEach(r => {
-    const k = `${r.film_title}|||${r.film_year}`;
-    if (!filmMap[k]) filmMap[k] = { title: r.film_title, year: r.film_year, dates: [] };
-    if (!filmMap[k].dates.includes(r.date)) filmMap[k].dates.push(r.date);
-  });
-  const out = Object.values(filmMap).sort((a,b)=>a.title.localeCompare(b.title));
+  const out = filmSummary();
   if (!out.length) { alert('No films to export'); return; }
   dl(JSON.stringify(out, null, 2), 'films.json', 'application/json');
 }
@@ -2445,6 +2745,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   renderClipBar();
+  renderFilterBar();
 
   // Firebase init
   const firebaseConfig = {
